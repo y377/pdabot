@@ -143,6 +143,28 @@
   <script crossorigin="anonymous" src="https://lib.baomitu.com/twitter-bootstrap/5.3.3/js/bootstrap.bundle.min.js"></script>
   <script crossorigin="anonymous" src="https://lib.baomitu.com/highlight.js/11.10.0/highlight.min.js"></script>
   <script src="https://lf-package-cn.feishucdn.com/obj/feishu-static/lark/passport/qrcode/LarkSSOSDKWebQRCode-1.0.3.js"></script>
+  <script>
+    // 飞书二维码扫码登录集成
+    (function () {
+      var client_id = 'cli_a8be137e6579500b';
+      var redirect_uri = encodeURIComponent('https://pdabot.jsjs.net/');
+      var state = Math.random().toString(36).slice(2);
+      var goto = `https://passport.feishu.cn/suite/passport/oauth/authorize?client_id=${client_id}&redirect_uri=${redirect_uri}&response_type=code&state=${state}`;
+      var QRLoginObj = QRLogin({
+        id: "login_container",
+        goto: goto,
+        width: "300",
+        height: "300"
+      });
+      var handleMessage = function (event) {
+        if (QRLoginObj.matchOrigin(event.origin) && QRLoginObj.matchData(event.data)) {
+          var loginTmpCode = event.data.tmp_code;
+          window.location.href = `${goto}&tmp_code=${loginTmpCode}`;
+        }
+      };
+      window.addEventListener('message', handleMessage, false);
+    })();
+  </script>
   <script src="pda.js"></script>
 </body>
 
