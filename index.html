@@ -7,7 +7,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta http-equiv="X-UA-Compatible" content="IE=edge" />
   <link rel="icon" href="/favicon.png" type="image/png">
-<!--   <link rel="manifest" href="/manifest.json"> -->
+  <!-- <link rel="manifest" href="/manifest.json"> -->
   <meta name="theme-color" content="#6c757d">
   <link crossorigin="anonymous" href="https://lib.baomitu.com/twitter-bootstrap/5.3.3/css/bootstrap.min.css" rel="stylesheet" />
   <link crossorigin="anonymous" href="https://lib.baomitu.com/bootstrap-icons/1.11.3/font/bootstrap-icons.min.css" rel="stylesheet" />
@@ -21,7 +21,7 @@
     };
   </script>
   <script src="https://lf-package-cn.feishucdn.com/obj/feishu-static/op/fe/devtools_frontend/remote-debug-0.0.1-alpha.6.js"></script>
-  <script src="https://s3.pstatp.com/ee/lark/js/open-js-sdk-1.5.23.js"></script>
+  <script src="https://lf1-cdn-tos.bytegoofy.com/obj/larkcloud-fee/ee/lark/js/open-js-sdk-latest.js"></script>
 </head>
 
 <body class="container mb-5">
@@ -38,7 +38,9 @@
 
   <!-- 主界面（默认隐藏） -->
   <div id="mainContainer" class="d-none">
+
     <h5 class="text-center pt-3"><i class="bi bi-upc-scan px-2"></i>PDA扫码助手</h5>
+
     <div id="toastContainer" class="position-fixed top-50 start-50 translate-middle" style="z-index: 9999;"></div>
 
     <div class="row mb-3">
@@ -123,14 +125,6 @@
       <input id="oldPN" list="oldPnOptions" type="text" class="form-control" placeholder="" autocorrect="off">
       <datalist id="oldPnOptions"></datalist>
     </div>
-
-    <div class="form-group my-3">
-      <label class="form-label fw-bold" for="chatSelect">发送到群：</label>
-      <select id="chatSelect" class="form-select">
-        <option value="">请选择群</option>
-      </select>
-    </div>
-
     <div class="d-flex justify-content-between align-items-center my-4 pt-3">
       <button id="resetBtn" class="btn btn-warning" onclick="resetForm()"><i class="bi bi-arrow-counterclockwise pe-1"></i>清空</button>
       <button id="copyBtn" class="btn btn-danger"><i class="bi bi-copy pe-1"></i>复制</button>
@@ -143,7 +137,58 @@
   <script crossorigin="anonymous" src="https://lib.baomitu.com/twitter-bootstrap/5.3.3/js/bootstrap.bundle.min.js"></script>
   <script crossorigin="anonymous" src="https://lib.baomitu.com/highlight.js/11.10.0/highlight.min.js"></script>
   <script src="https://lf-package-cn.feishucdn.com/obj/feishu-static/lark/passport/qrcode/LarkSSOSDKWebQRCode-1.0.3.js"></script>
-  <script src="pda.js"></script>
+  <script>
+    window.partsDataReady = false;
+    (async function () {
+      try {
+        // 优先用 Service Worker 缓存
+        const res = await fetch('https://pn.jsjs.net/pn', { cache: 'force-cache' });
+        window.partsData = await res.json();
+        window.partsDataReady = true;
+        window.dispatchEvent(new Event('partsDataLoaded'));
+      } catch (error) {
+        console.error('加载配件数据失败:', error);
+        const toast = document.createElement('div');
+        toast.className = 'toast align-items-center text-white bg-danger border-0';
+        toast.setAttribute('role', 'alert');
+        toast.setAttribute('aria-live', 'assertive');
+        toast.setAttribute('aria-atomic', 'true');
+        toast.innerHTML = `
+        <div class="d-flex">
+          <div class="toast-body">
+            加载配件数据失败，请刷新页面重试
+          </div>
+          <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button>
+        </div>
+      `;
+        document.getElementById('toastContainer').appendChild(toast);
+        new bootstrap.Toast(toast).show();
+      }
+    })();
+
+    // 飞书二维码扫码登录集成
+    (function () {
+      var client_id = 'cli_a8be137e6579500b';
+      var redirect_uri = encodeURIComponent('https://pdabot.jsjs.net/');
+      var state = Math.random().toString(36).slice(2);
+      var goto = `https://passport.feishu.cn/suite/passport/oauth/authorize?client_id=${client_id}&redirect_uri=${redirect_uri}&response_type=code&state=${state}`;
+      var QRLoginObj = QRLogin({
+        id: "login_container",
+        goto: goto,
+        width: "300",
+        height: "300"
+      });
+      var handleMessage = function (event) {
+        if (QRLoginObj.matchOrigin(event.origin) && QRLoginObj.matchData(event.data)) {
+          var loginTmpCode = event.data.tmp_code;
+          window.location.href = `${goto}&tmp_code=${loginTmpCode}`;
+        }
+      };
+      window.addEventListener('message', handleMessage, false);
+    })();
+  </script>
+  <!-- <script src="/pwa.js"></script> -->
+  <script src="/pda.js"></script>
 </body>
 
-</html> 
+</html>
