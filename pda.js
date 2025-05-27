@@ -1,6 +1,3 @@
-// 复制自 e:/PDA_BOT/pda.js
-// ... 这里将会是完整的 pda.js 内容 ... 
-
 const orderNo = document.getElementById("orderNo");
 const typeSelect = document.getElementById("type");
 const switchLocation = document.getElementById("switchLocation");
@@ -206,6 +203,9 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     // 检查登录状态
     checkLogin();
+
+    // 页面加载时自动填充群列表
+    loadChatList();
   } catch (error) {
     console.error('页面初始化失败:', error);
   }
@@ -665,10 +665,27 @@ function update() {
   saveFormData();
 }
 
-// 修改 sendToFeishu 函数，直接调用 Cloudflare Worker 的 /api/send-card 接口
+// 页面加载时自动填充群列表
+function loadChatList() {
+  const chatList = [
+    { id: 'oc_38e4d6bc7254c22103122914dde640fe', name: '配件扫码SN/PN测试' },
+    // 可以继续添加更多群
+  ];
+  const chatSelect = document.getElementById('chatSelect');
+  chatSelect.innerHTML = '<option value="">请选择群</option>' + chatList.map(
+    c => `<option value="${c.id}">${c.name}</option>`
+  ).join('');
+}
+
+// 修改 sendToFeishu，传递 chatId 并打印 message_id
 function sendToFeishu() {
   const type = typeSelect.value;
   const orderInput = orderNo.value.trim();
+  const chatId = document.getElementById('chatSelect').value;
+  if (!chatId) {
+    showToast('请选择要发送的群', 'warning');
+    return;
+  }
   // 检查是否为完整url
   const urlMatch = orderInput.match(/https?:\/\/[\S]+/);
   if (!urlMatch) {
@@ -681,10 +698,7 @@ function sendToFeishu() {
     showToast("链接中未找到单号数字", "warning");
     return;
   }
-
-  // 这里你可以自定义卡片标题内容
   const cardTitle = `更换通知 - ${type}`;
-
   fetch("https://pdabot-worker.csever.workers.dev/api/send-card", {
     method: "POST",
     headers: {
@@ -692,13 +706,16 @@ function sendToFeishu() {
     },
     body: JSON.stringify({
       title: cardTitle,
-      orderNo: orderNum
+      orderNo: orderNum,
+      chatId: chatId
     }),
   })
     .then(async (res) => {
       const data = await res.json();
       if (data.success) {
         showToast("卡片消息已发送 ✅", "success");
+        // 打印 message_id
+        console.log('飞书返回的 message_id:', data.data.message_id);
       } else {
         showToast(`发送失败 ❌ (${data.error || '未知错误'})`, 'danger');
       }
