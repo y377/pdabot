@@ -665,16 +665,19 @@ function update() {
   saveFormData();
 }
 
-// 页面加载时自动填充群列表
-function loadChatList() {
-  const chatList = [
-    { id: 'oc_38e4d6bc7254c22103122914dde640fe', name: '配件扫码SN/PN测试' },
-    // 可以继续添加更多群
-  ];
-  const chatSelect = document.getElementById('chatSelect');
-  chatSelect.innerHTML = '<option value="">请选择群</option>' + chatList.map(
-    c => `<option value="${c.id}">${c.name}</option>`
-  ).join('');
+// 页面加载时自动拉取群列表
+async function loadChatList() {
+  try {
+    const res = await fetch('https://pdabot-worker.csever.workers.dev/api/chat-list');
+    const data = await res.json();
+    const chatList = (data.data && data.data.items) ? data.data.items : [];
+    const chatSelect = document.getElementById('chatSelect');
+    chatSelect.innerHTML = '<option value="">请选择群</option>' + chatList.map(
+      c => `<option value="${c.chat_id}">${c.name}</option>`
+    ).join('');
+  } catch (e) {
+    showToast('群列表加载失败', 'danger');
+  }
 }
 
 // 修改 sendToFeishu，传递 chatId 并打印 message_id
