@@ -278,7 +278,7 @@ async function handleFeishuCallback(code) {
 // 修改 redirectToFeishuLogin 函数
 function redirectToFeishuLogin() {
   const client_id = 'cli_a8be137e6579500b';
-  const redirect_uri = encodeURIComponent('https://pwa-pda.jsjs.net/');
+  const redirect_uri = encodeURIComponent('https://pdabot.jsjs.net/');
   const state = Math.random().toString(36).slice(2);
   const url = `https://passport.feishu.cn/suite/passport/oauth/authorize?client_id=${client_id}&redirect_uri=${redirect_uri}&response_type=code&state=${state}`;
   window.location.href = url;
