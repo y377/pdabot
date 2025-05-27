@@ -7,7 +7,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta http-equiv="X-UA-Compatible" content="IE=edge" />
   <link rel="icon" href="/favicon.png" type="image/png">
-<!--   <link rel="manifest" href="/manifest.json"> -->
+  <!-- <link rel="manifest" href="/manifest.json"> -->
   <meta name="theme-color" content="#6c757d">
   <link crossorigin="anonymous" href="https://lib.baomitu.com/twitter-bootstrap/5.3.3/css/bootstrap.min.css" rel="stylesheet" />
   <link crossorigin="anonymous" href="https://lib.baomitu.com/bootstrap-icons/1.11.3/font/bootstrap-icons.min.css" rel="stylesheet" />
@@ -203,6 +203,21 @@
       };
       window.addEventListener('message', handleMessage, false);
     })();
+
+    async function loadChatList() {
+      try {
+        const res = await fetch('https://pdabot-worker.csever.workers.dev/api/chat-list');
+        const data = await res.json();
+        const chatList = (data.data && data.data.items) ? data.data.items : [];
+        const chatSelect = document.getElementById('chatSelect');
+        chatSelect.innerHTML = '<option value="">请选择群</option>' + chatList.map(
+          c => `<option value="${c.chat_id}">${c.name}</option>`
+        ).join('');
+      } catch (e) {
+        showToast('群列表加载失败', 'danger');
+      }
+    }
+    document.addEventListener('DOMContentLoaded', loadChatList);
   </script>
   <script src="pda.js"></script>
 </body>
