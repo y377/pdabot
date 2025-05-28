@@ -758,7 +758,8 @@ function sendToFeishu() {
         return (select.value || '').trim();
       }
       return (oldPN.value || '').trim();
-    })()
+    })(),
+    user_name: (currentUser && currentUser.name) ? currentUser.name : ''
   };
   // 调试输出
   console.log('发送到worker的数据:', JSON.stringify({
