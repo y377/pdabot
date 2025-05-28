@@ -206,9 +206,6 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     // 页面加载时自动填充群列表
     loadChatList();
-
-    // 页面初始化时，主动刷新一次预览
-    update();
   } catch (error) {
     console.error('页面初始化失败:', error);
   }
@@ -219,13 +216,22 @@ function checkLogin() {
   try {
     const urlParams = new URLSearchParams(window.location.search);
     const code = urlParams.get('code');
+    
     if (code) {
+      // 有 code 参数，说明是飞书登录回调
       handleFeishuCallback(code);
     } else {
+      // 检查 localStorage 中的登录状态
       const isLoggedIn = localStorage.getItem('isLoggedIn') === 'true';
-      if (isLoggedIn) {
+      const userId = localStorage.getItem('userId');
+      const userName = localStorage.getItem('userName');
+      
+      if (isLoggedIn && userId && userName) {
+        // 已登录，显示主界面
+        currentUser = { id: userId, name: userName };
         showMainUI();
       } else {
+        // 未登录，显示登录界面
         showLoginUI();
       }
     }
@@ -404,7 +410,7 @@ function bindEvents() {
       if (switchInfoRow) switchInfoRow.classList.toggle("d-none", !isOptical);
       await updateBrandOptions();
       update();
-      switchPnInput(type);
+      switchPnInput(type); // 传type字符串
     });
   }
 
@@ -428,26 +434,9 @@ function bindEvents() {
     });
   }
 
-  // 为所有输入框添加事件监听
-  [orderNo, serverSN, switchLocation, portNo, newPN, newSN, oldPN, oldSN].forEach((el) => {
-    if (el) {
-      el.addEventListener("input", update);
-      el.addEventListener("change", update);
-      el.addEventListener("paste", function() {
-        setTimeout(update, 0);
-      });
-    }
-  });
+  [orderNo, serverSN, switchLocation, portNo, newPN, newSN, oldPN, oldSN].forEach((el) => el.addEventListener("input", update));
 
-  // 为PN选择框添加事件监听
-  ["newPNSelect", "oldPNSelect"].forEach(id => {
-    const select = document.getElementById(id);
-    if (select) {
-      select.addEventListener("change", update);
-    }
-  });
-
-  if (copyBtn) {
+  if (copyBtn)
     copyBtn.addEventListener("click", () => {
       const text = preview.innerText.trim();
       navigator.clipboard
@@ -459,7 +448,6 @@ function bindEvents() {
           showToast("复制失败，请手动复制", "danger");
         });
     });
-  }
 }
 
 // 生成硬盘PN下拉选项
@@ -692,7 +680,7 @@ async function loadChatList() {
   }
 }
 
-// 修改 sendToFeishu 函数
+// 修改 sendToFeishu，传递 chatId 并打印 message_id
 function sendToFeishu() {
   const type = typeSelect.value;
   const orderInput = orderNo.value.trim();
@@ -717,7 +705,7 @@ function sendToFeishu() {
   fetch("https://pdabot-worker.jsjs.net/api/send-card", {
     method: "POST",
     headers: {
-      "Content-Type": "application/json"
+      "Content-Type": "application/json",
     },
     body: JSON.stringify({
       title: cardTitle,
@@ -729,6 +717,7 @@ function sendToFeishu() {
       const data = await res.json();
       if (data.success) {
         showToast("卡片消息已发送 ✅", "success");
+        // 打印 message_id
         console.log('飞书返回的 message_id:', data.data.message_id);
       } else {
         showToast(`发送失败 ❌ (${data.error || '未知错误'})`, 'danger');
@@ -768,9 +757,7 @@ function sendApplyNotify() {
   }
   fetch('https://test.jsjs.net', {
     method: 'POST',
-    headers: { 
-      'Content-Type': 'application/json'
-    },
+    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       type: 'apply',
       orderNum,
