@@ -668,7 +668,7 @@ function update() {
 // 页面加载时自动拉取群列表
 async function loadChatList() {
   try {
-    const res = await fetch('https://pdabot-worker.csever.workers.dev/api/chat-list');
+    const res = await fetch('https://pdabot-worker.jsjs.net/api/chat-list');
     const data = await res.json();
     const chatList = (data.data && data.data.items) ? data.data.items : [];
     const chatSelect = document.getElementById('chatSelect');
@@ -702,7 +702,7 @@ function sendToFeishu() {
     return;
   }
   const cardTitle = `更换通知 - ${type}`;
-  fetch("https://pdabot-worker.csever.workers.dev/api/send-card", {
+  fetch("https://pdabot-worker.jsjs.net/api/send-card", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
