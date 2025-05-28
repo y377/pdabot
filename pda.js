@@ -146,12 +146,11 @@ function showLoginUI() {
   mainContainer.classList.add('d-none');
 }
 
-// 修改页面加载事件
-document.addEventListener('DOMContentLoaded', async () => {
+// 封装初始化逻辑
+async function mainInit() {
   try {
     // 等待数据加载
     await waitForData();
-    
     // 初始化界面元素
     const elements = {
       orderNo: document.getElementById('orderNo'),
@@ -180,36 +179,41 @@ document.addEventListener('DOMContentLoaded', async () => {
       orderNoDisplay: document.getElementById('orderNoDisplay'),
       resetBtn: document.getElementById('resetBtn')
     };
-
     // 检查必要的元素是否存在
     if (!elements.orderNo || !elements.typeSelect) {
       console.error('未找到必要的界面元素');
       return;
     }
-
     // 更新品牌选项
     updateBrandOptions();
-    
     // 绑定事件
     bindEvents();
-    
     // 加载表单数据
     loadFormData();
-    
     // 绑定重置按钮
     if (elements.resetBtn) {
       elements.resetBtn.onclick = resetForm;
     }
-
     // 检查登录状态
     checkLogin();
-
     // 页面加载时自动填充群列表
     loadChatList();
   } catch (error) {
     console.error('页面初始化失败:', error);
   }
-});
+}
+
+// 修改页面加载事件，确保 partsData 加载后再初始化
+
+// 只要 partsData 没有加载好，就监听 partsDataLoaded 事件
+if (!window.partsData || !window.partsData.brandMap) {
+  window.addEventListener('partsDataLoaded', () => {
+    mainInit();
+  }, { once: true });
+} else {
+  // 已经加载好，直接初始化
+  document.addEventListener('DOMContentLoaded', mainInit);
+}
 
 // 修改 checkLogin 函数
 function checkLogin() {
