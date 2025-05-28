@@ -736,38 +736,44 @@ function sendToFeishu() {
     showToast("链接中未找到单号数字", "warning");
     return;
   }
-  // 取表单内容，变量名与卡片模板一致
+  // 取表单内容，变量名与卡片模板一致，全部转为字符串
   const data = {
-    shangxin_xiajiu: `更换「${type}」`,
-    danhao: orderNum,
-    fuwuqi_sn: serverSN.value.trim(),
-    xinpin_pinpai: newBrand.value,
-    xinpin_sn: newSN.value.trim(),
+    shangxin_xiajiu: `更换「${type || ''}」`,
+    danhao: orderNum + '',
+    fuwuqi_sn: (serverSN.value || '').trim(),
+    xinpin_pinpai: (newBrand.value || '').trim(),
+    xinpin_sn: (newSN.value || '').trim(),
     xinpin_pn: (() => {
       const select = document.getElementById('newPNSelect');
       if (select && select.style.display !== 'none') {
-        return select.value;
+        return (select.value || '').trim();
       }
-      return newPN.value.trim();
+      return (newPN.value || '').trim();
     })(),
-    jiupin_pinpai: oldBrand.value,
-    jiupin_sn: oldSN.value.trim(),
+    jiupin_pinpai: (oldBrand.value || '').trim(),
+    jiupin_sn: (oldSN.value || '').trim(),
     jiupin_pn: (() => {
       const select = document.getElementById('oldPNSelect');
       if (select && select.style.display !== 'none') {
-        return select.value;
+        return (select.value || '').trim();
       }
-      return oldPN.value.trim();
+      return (oldPN.value || '').trim();
     })()
   };
-  const cardTitle = `更换通知 - ${type}`;
+  // 调试输出
+  console.log('发送到worker的数据:', JSON.stringify({
+    title: `更换通知 - ${type}`,
+    orderNo: orderNum,
+    chatId: chatId,
+    data: data
+  }));
   fetch("https://pdabot-worker.jsjs.net/api/send-card", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
-      title: cardTitle,
+      title: `更换通知 - ${type}`,
       orderNo: orderNum,
       chatId: chatId,
       data: data
