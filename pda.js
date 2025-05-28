@@ -736,9 +736,30 @@ function sendToFeishu() {
     showToast("链接中未找到单号数字", "warning");
     return;
   }
-  // 获取预览区内容并转为对象
-  const previewText = preview.innerText.trim();
-  const cardData = markdownTableToObject(previewText);
+  // 取表单内容，变量名与卡片模板一致
+  const data = {
+    shangxin_xiajiu: `更换「${type}」`,
+    danhao: orderNum,
+    fuwuqi_sn: serverSN.value.trim(),
+    xinpin_pinpai: newBrand.value,
+    xinpin_sn: newSN.value.trim(),
+    xinpin_pn: (() => {
+      const select = document.getElementById('newPNSelect');
+      if (select && select.style.display !== 'none') {
+        return select.value;
+      }
+      return newPN.value.trim();
+    })(),
+    jiupin_pinpai: oldBrand.value,
+    jiupin_sn: oldSN.value.trim(),
+    jiupin_pn: (() => {
+      const select = document.getElementById('oldPNSelect');
+      if (select && select.style.display !== 'none') {
+        return select.value;
+      }
+      return oldPN.value.trim();
+    })()
+  };
   const cardTitle = `更换通知 - ${type}`;
   fetch("https://pdabot-worker.jsjs.net/api/send-card", {
     method: "POST",
@@ -749,7 +770,7 @@ function sendToFeishu() {
       title: cardTitle,
       orderNo: orderNum,
       chatId: chatId,
-      data: cardData // 传递对象数据
+      data: data
     }),
   })
     .then(async (res) => {
