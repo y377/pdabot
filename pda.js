@@ -223,10 +223,7 @@ function checkLogin() {
       handleFeishuCallback(code);
     } else {
       const isLoggedIn = localStorage.getItem('isLoggedIn') === 'true';
-      const userId = localStorage.getItem('userId');
-      const userName = localStorage.getItem('userName');
-      if (isLoggedIn && userId && userName) {
-        window.currentUser = { id: userId, name: userName };
+      if (isLoggedIn) {
         showMainUI();
       } else {
         showLoginUI();
