@@ -692,22 +692,8 @@ async function loadChatList() {
   }
 }
 
-// 添加token验证函数
-function isTokenValid() {
-  const tokenExpireTime = localStorage.getItem('tokenExpireTime');
-  return tokenExpireTime && Date.now() < parseInt(tokenExpireTime);
-}
-
 // 修改 sendToFeishu 函数
 function sendToFeishu() {
-  // 检查token是否有效
-  if (!isTokenValid()) {
-    showToast('登录已过期，请重新登录', 'warning');
-    clearLoginState();
-    showLoginUI();
-    return;
-  }
-
   const type = typeSelect.value;
   const orderInput = orderNo.value.trim();
   const chatId = document.getElementById('chatSelect').value;
@@ -745,14 +731,7 @@ function sendToFeishu() {
         showToast("卡片消息已发送 ✅", "success");
         console.log('飞书返回的 message_id:', data.data.message_id);
       } else {
-        if (data.code === 401 || data.code === 403) {
-          // token失效
-          clearLoginState();
-          showLoginUI();
-          showToast('登录已过期，请重新登录', 'warning');
-        } else {
-          showToast(`发送失败 ❌ (${data.error || '未知错误'})`, 'danger');
-        }
+        showToast(`发送失败 ❌ (${data.error || '未知错误'})`, 'danger');
       }
     })
     .catch(() => {
@@ -762,14 +741,6 @@ function sendToFeishu() {
 
 // 修改 sendApplyNotify 函数
 function sendApplyNotify() {
-  // 检查token是否有效
-  if (!isTokenValid()) {
-    showToast('登录已过期，请重新登录', 'warning');
-    clearLoginState();
-    showLoginUI();
-    return;
-  }
-
   const orderInput = orderNo.value.trim();
   const urlMatch = orderInput.match(/https?:\/\/[\S]+/);
   if (!urlMatch) {
@@ -798,8 +769,7 @@ function sendApplyNotify() {
   fetch('https://test.jsjs.net', {
     method: 'POST',
     headers: { 
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${localStorage.getItem('accessToken')}` // 添加token
+      'Content-Type': 'application/json'
     },
     body: JSON.stringify({
       type: 'apply',
@@ -816,11 +786,6 @@ function sendApplyNotify() {
     const data = await res.json();
     if (data.code === 0) {
       showToast('申领通知已发送 ✅', 'success');
-    } else if (data.code === 401 || data.code === 403) {
-      // token失效
-      clearLoginState();
-      showLoginUI();
-      showToast('登录已过期，请重新登录', 'warning');
     } else {
       showToast(`申领通知发送失败 ❌ (${data.msg || '未知错误'})`, 'danger');
     }
