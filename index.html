@@ -17,7 +17,7 @@
     window.FEISHU_DEBUG = {
       app_id: 'cli_a8be137e6579500b',
       debug_session: 'NWU0Y2YzYmUtNWYwYy00ZTQwLTk3OTQtZDYwN2E3MGE5N2I4',
-      debug_url: 'https://pwa-pda.jsjs.net/'
+      debug_url: 'https://pdabot.jsjs.net/'
     };
   </script>
   <script src="https://lf-package-cn.feishucdn.com/obj/feishu-static/op/fe/devtools_frontend/remote-debug-0.0.1-alpha.6.js"></script>
@@ -144,6 +144,12 @@
   <script crossorigin="anonymous" src="https://lib.baomitu.com/highlight.js/11.10.0/highlight.min.js"></script>
   <script src="https://lf-package-cn.feishucdn.com/obj/feishu-static/lark/passport/qrcode/LarkSSOSDKWebQRCode-1.0.3.js"></script>
   <script>
+    // 检查登录状态
+    checkLogin();
+
+    // 页面加载时自动填充群列表
+    loadChatList();
+
     // 自动处理 code 并切换主界面
     document.addEventListener('DOMContentLoaded', function() {
       const urlParams = new URLSearchParams(window.location.search);
@@ -217,7 +223,92 @@
         showToast('群列表加载失败', 'danger');
       }
     }
-    document.addEventListener('DOMContentLoaded', loadChatList);
+
+    // 修改 checkLogin 函数
+    function checkLogin() {
+      try {
+        const urlParams = new URLSearchParams(window.location.search);
+        const code = urlParams.get('code');
+        
+        if (code) {
+          // 有 code 参数，说明是飞书登录回调
+          handleFeishuCallback(code);
+        } else {
+          // 检查 localStorage 中的登录状态
+          const isLoggedIn = localStorage.getItem('isLoggedIn') === 'true';
+          const userId = localStorage.getItem('userId');
+          const userName = localStorage.getItem('userName');
+          const accessToken = localStorage.getItem('accessToken');
+          const tokenExpireTime = localStorage.getItem('tokenExpireTime');
+          
+          if (isLoggedIn && userId && userName && accessToken && tokenExpireTime) {
+            if (Date.now() < parseInt(tokenExpireTime)) {
+              // token有效，显示主界面
+              currentUser = { id: userId, name: userName };
+              showMainUI();
+            } else {
+              // token已过期，清除登录状态并显示登录界面
+              clearLoginState();
+              showLoginUI();
+            }
+          } else {
+            showLoginUI();
+          }
+        }
+      } catch (error) {
+        console.error('检查登录状态失败:', error);
+        showLoginUI();
+      }
+    }
+
+    // 修改 handleFeishuCallback 函数
+    async function handleFeishuCallback(code) {
+      try {
+        const res = await fetch('https://login-pda.jsjs.net/auth', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ 
+            code,
+            redirect_uri: 'https://pdabot.jsjs.net/'
+          })
+        });
+        const data = await res.json();
+        if (data.code === 0) {
+          currentUser = data.data;
+          // 保存登录状态到 localStorage，包括token信息
+          localStorage.setItem('isLoggedIn', 'true');
+          localStorage.setItem('userId', currentUser.open_id || currentUser.user_id || currentUser.id || '');
+          localStorage.setItem('userName', currentUser.name);
+          localStorage.setItem('accessToken', data.data.access_token || '');
+          // 设置token过期时间，默认2小时
+          localStorage.setItem('tokenExpireTime', Date.now() + (data.data.expires_in || 7200) * 1000);
+          
+          // 清除 URL 中的 code 参数
+          window.history.replaceState({}, '', '/');
+          showToast(`欢迎，${currentUser.name}`, 'success');
+          showMainUI();
+        } else {
+          showToast('登录失败', 'danger');
+          showLoginUI();
+        }
+      } catch (error) {
+        console.error('登录失败:', error);
+        showToast('登录失败', 'danger');
+        showLoginUI();
+      }
+    }
+
+    // 添加清除登录状态的函数
+    function clearLoginState() {
+      localStorage.removeItem('isLoggedIn');
+      localStorage.removeItem('userId');
+      localStorage.removeItem('userName');
+      localStorage.removeItem('accessToken');
+      localStorage.removeItem('tokenExpireTime');
+    }
+
+    // 修改 redirectToFeishuLogin 函数
+    // ... existing code ...
   </script>
   <script src="pda.js"></script>
 </body>
