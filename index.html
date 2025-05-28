@@ -17,7 +17,7 @@
     window.FEISHU_DEBUG = {
       app_id: 'cli_a8be137e6579500b',
       debug_session: 'NWU0Y2YzYmUtNWYwYy00ZTQwLTk3OTQtZDYwN2E3MGE5N2I4',
-      debug_url: 'https://pdabot.jsjs.net/'
+      debug_url: 'https://pwa-pda.jsjs.net/'
     };
   </script>
   <script src="https://lf-package-cn.feishucdn.com/obj/feishu-static/op/fe/devtools_frontend/remote-debug-0.0.1-alpha.6.js"></script>
@@ -144,147 +144,45 @@
   <script crossorigin="anonymous" src="https://lib.baomitu.com/highlight.js/11.10.0/highlight.min.js"></script>
   <script src="https://lf-package-cn.feishucdn.com/obj/feishu-static/lark/passport/qrcode/LarkSSOSDKWebQRCode-1.0.3.js"></script>
   <script>
-    // 添加UI控制函数
-    function showMainUI() {
-      const loginContainer = document.getElementById('loginContainer');
-      const mainContainer = document.getElementById('mainContainer');
-      
-      if (!loginContainer || !mainContainer) {
-        console.error('未找到登录或主界面容器');
-        return;
-      }
-
-      loginContainer.classList.add('d-none');
-      mainContainer.classList.remove('d-none');
-    }
-
-    function showLoginUI() {
-      const loginContainer = document.getElementById('loginContainer');
-      const mainContainer = document.getElementById('mainContainer');
-      
-      if (!loginContainer || !mainContainer) {
-        console.error('未找到登录或主界面容器');
-        return;
-      }
-
-      loginContainer.classList.remove('d-none');
-      mainContainer.classList.add('d-none');
-    }
-
-    // 添加清除登录状态的函数
-    function clearLoginState() {
-      localStorage.removeItem('isLoggedIn');
-      localStorage.removeItem('userId');
-      localStorage.removeItem('userName');
-      localStorage.removeItem('accessToken');
-      localStorage.removeItem('tokenExpireTime');
-    }
-
-    // 修改 checkLogin 函数
-    function checkLogin() {
-      try {
-        const urlParams = new URLSearchParams(window.location.search);
-        const code = urlParams.get('code');
-        
-        if (code) {
-          // 有 code 参数，说明是飞书登录回调
-          handleFeishuCallback(code);
-        } else {
-          // 检查 localStorage 中的登录状态
-          const isLoggedIn = localStorage.getItem('isLoggedIn') === 'true';
-          const userId = localStorage.getItem('userId');
-          const userName = localStorage.getItem('userName');
-          const accessToken = localStorage.getItem('accessToken');
-          const tokenExpireTime = localStorage.getItem('tokenExpireTime');
-          
-          if (isLoggedIn && userId && userName && accessToken && tokenExpireTime) {
-            if (Date.now() < parseInt(tokenExpireTime)) {
-              // token有效，显示主界面
-              window.currentUser = { id: userId, name: userName };
-              showMainUI();
-            } else {
-              // token已过期，清除登录状态并显示登录界面
-              clearLoginState();
-              showLoginUI();
-            }
-          } else {
-            showLoginUI();
-          }
-        }
-      } catch (error) {
-        console.error('检查登录状态失败:', error);
-        showLoginUI();
-      }
-    }
-
-    // 修改 handleFeishuCallback 函数
-    async function handleFeishuCallback(code) {
-      try {
-        const res = await fetch('https://login-pda.jsjs.net/auth', {
+    // 自动处理 code 并切换主界面
+    document.addEventListener('DOMContentLoaded', function() {
+      const urlParams = new URLSearchParams(window.location.search);
+      const code = urlParams.get('code');
+      if (code) {
+        // 调用后端 /auth 换用户信息
+        fetch('https://login-pda.jsjs.net/auth', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ 
-            code,
+          body: JSON.stringify({
+            code: code,
             redirect_uri: 'https://pdabot.jsjs.net/'
           })
+        })
+        .then(res => res.json())
+        .then(data => {
+          if (data.code === 0) {
+            // 登录成功，保存用户信息
+            localStorage.setItem('isLoggedIn', 'true');
+            localStorage.setItem('userId', data.data.open_id);
+            localStorage.setItem('userName', data.data.name);
+            // 清除 URL 中的 code 参数
+            window.history.replaceState({}, '', '/');
+            // 切换到主界面
+            document.getElementById('loginContainer').classList.add('d-none');
+            document.getElementById('mainContainer').classList.remove('d-none');
+          } else {
+            alert('登录失败：' + (data.msg || '未知错误'));
+          }
+        })
+        .catch(() => {
+          alert('登录失败，网络错误');
         });
-        const data = await res.json();
-        if (data.code === 0) {
-          window.currentUser = data.data;
-          // 保存登录状态到 localStorage，包括token信息
-          localStorage.setItem('isLoggedIn', 'true');
-          localStorage.setItem('userId', data.data.open_id || data.data.user_id || data.data.id || '');
-          localStorage.setItem('userName', data.data.name);
-          localStorage.setItem('accessToken', data.data.access_token || '');
-          // 设置token过期时间，默认2小时
-          localStorage.setItem('tokenExpireTime', Date.now() + (data.data.expires_in || 7200) * 1000);
-          
-          // 清除 URL 中的 code 参数
-          window.history.replaceState({}, '', '/');
-          showToast(`欢迎，${data.data.name}`, 'success');
-          showMainUI();
-        } else {
-          showToast('登录失败', 'danger');
-          showLoginUI();
-        }
-      } catch (error) {
-        console.error('登录失败:', error);
-        showToast('登录失败', 'danger');
-        showLoginUI();
+      } else {
+        // 没有 code，显示二维码界面
+        document.getElementById('loginContainer').classList.remove('d-none');
+        document.getElementById('mainContainer').classList.add('d-none');
       }
-    }
-
-    // 添加 showToast 函数
-    function showToast(msg, type = "primary", delay = 5000) {
-      const container = document.getElementById("toastContainer");
-      if (!container) {
-        console.error('未找到提示框容器');
-        return;
-      }
-
-      const toast = document.createElement("div");
-      toast.className = `toast text-bg-${type} border-0`;
-      toast.setAttribute("role", "alert");
-      toast.setAttribute("aria-live", "assertive");
-      toast.setAttribute("aria-atomic", "true");
-      toast.innerHTML = `<div class="toast-body">${msg}</div>`;
-      container.appendChild(toast);
-
-      const bsToast = new bootstrap.Toast(toast, {
-        animation: true,
-        autohide: true,
-        delay: delay
-      });
-      bsToast.show();
-      toast.addEventListener('hidden.bs.toast', () => toast.remove());
-    }
-
-    // 页面加载完成后检查登录状态
-    document.addEventListener('DOMContentLoaded', function() {
-      checkLogin();
-      loadChatList();
     });
-
     // 飞书二维码扫码登录集成
     (function () {
       var client_id = 'cli_a8be137e6579500b';
@@ -319,6 +217,7 @@
         showToast('群列表加载失败', 'danger');
       }
     }
+    document.addEventListener('DOMContentLoaded', loadChatList);
   </script>
   <script src="pda.js"></script>
 </body>
