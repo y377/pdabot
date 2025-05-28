@@ -219,22 +219,16 @@ function checkLogin() {
   try {
     const urlParams = new URLSearchParams(window.location.search);
     const code = urlParams.get('code');
-    
     if (code) {
-      // 有 code 参数，说明是飞书登录回调
       handleFeishuCallback(code);
     } else {
-      // 检查 localStorage 中的登录状态
       const isLoggedIn = localStorage.getItem('isLoggedIn') === 'true';
       const userId = localStorage.getItem('userId');
       const userName = localStorage.getItem('userName');
-      
       if (isLoggedIn && userId && userName) {
-        // 已登录，显示主界面
-        currentUser = { id: userId, name: userName };
+        window.currentUser = { id: userId, name: userName };
         showMainUI();
       } else {
-        // 未登录，显示登录界面
         showLoginUI();
       }
     }
