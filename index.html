@@ -17,7 +17,7 @@
     window.FEISHU_DEBUG = {
       app_id: 'cli_a8be137e6579500b',
       debug_session: 'NWU0Y2YzYmUtNWYwYy00ZTQwLTk3OTQtZDYwN2E3MGE5N2I4',
-      debug_url: 'https://pwa-pda.jsjs.net/'
+      debug_url: 'https://pdabot.jsjs.net/'
     };
   </script>
   <script src="https://lf-package-cn.feishucdn.com/obj/feishu-static/op/fe/devtools_frontend/remote-debug-0.0.1-alpha.6.js"></script>
@@ -26,20 +26,16 @@
 
 <body class="container mb-5">
   <!-- 登录界面 -->
-<!--   <div id="loginContainer" class="text-center py-5">
-    <h4 class="mb-4"><i class="bi bi-upc-scan px-2"></i>PDA扫码助手</h4>
-    <div class="card mx-auto" style="max-width: 400px;">
+  <div id="loginContainer" class="text-center py-5">
+    <h4 class="card-header"><i class="bi bi-upc-scan px-2"></i>PDA扫码助手</h4>
+    <div class="card mx-auto">
       <div class="card-body">
-        <h5 class="card-title mb-4">请使用飞书扫码登录</h5>
         <div id="login_container"></div>
+        <p class="card-text">请使用飞书扫码登录</p>
       </div>
     </div>
-  </div> -->
-<div class="card" id="login_container">
-  <div class="card-body" >
-    <p class="card-text">请使用飞书扫码登录</p>
   </div>
-</div>
+
   <!-- 主界面（默认隐藏） -->
   <div id="mainContainer" class="d-none">
     <h5 class="text-center pt-3"><i class="bi bi-upc-scan px-2"></i>PDA扫码助手</h5>
