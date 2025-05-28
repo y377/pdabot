@@ -206,11 +206,11 @@
 
     async function loadChatList() {
       try {
-        const res = await fetch('https://pdabot-worker.csever.workers.dev/api/chat-list');
+        const res = await fetch('https://pdabot-worker.jsjs.net/api/chat-list');
         const data = await res.json();
         const chatList = (data.data && data.data.items) ? data.data.items : [];
         const chatSelect = document.getElementById('chatSelect');
-        chatSelect.innerHTML = '<option value="">请选择群</option>' + chatList.map(
+        chatSelect.innerHTML = '<option selected>请选择群</option>' + chatList.map(
           c => `<option value="${c.chat_id}">${c.name}</option>`
         ).join('');
       } catch (e) {
