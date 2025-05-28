@@ -410,7 +410,7 @@ function bindEvents() {
       if (switchInfoRow) switchInfoRow.classList.toggle("d-none", !isOptical);
       await updateBrandOptions();
       update();
-      switchPnInput(type); // 传type字符串
+      switchPnInput(type);
     });
   }
 
@@ -434,9 +434,26 @@ function bindEvents() {
     });
   }
 
-  [orderNo, serverSN, switchLocation, portNo, newPN, newSN, oldPN, oldSN].forEach((el) => el.addEventListener("input", update));
+  // 为所有输入框添加事件监听
+  [orderNo, serverSN, switchLocation, portNo, newPN, newSN, oldPN, oldSN].forEach((el) => {
+    if (el) {
+      el.addEventListener("input", update);
+      el.addEventListener("change", update);
+      el.addEventListener("paste", function() {
+        setTimeout(update, 0);
+      });
+    }
+  });
 
-  if (copyBtn)
+  // 为PN选择框添加事件监听
+  ["newPNSelect", "oldPNSelect"].forEach(id => {
+    const select = document.getElementById(id);
+    if (select) {
+      select.addEventListener("change", update);
+    }
+  });
+
+  if (copyBtn) {
     copyBtn.addEventListener("click", () => {
       const text = preview.innerText.trim();
       navigator.clipboard
@@ -448,6 +465,7 @@ function bindEvents() {
           showToast("复制失败，请手动复制", "danger");
         });
     });
+  }
 }
 
 // 生成硬盘PN下拉选项
