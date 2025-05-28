@@ -704,7 +704,18 @@ async function loadChatList() {
   }
 }
 
-// 修改 sendToFeishu，传递 chatId 并打印 message_id
+// 新增：将Markdown表格转为对象
+function markdownTableToObject(md) {
+  const lines = md.trim().split('\n').filter(line => line.includes('|'));
+  const obj = {};
+  for (let i = 2; i < lines.length; i++) { // 跳过表头和分隔线
+    const [key, value] = lines[i].split('|').slice(1, 3).map(s => s.trim());
+    obj[key] = value;
+  }
+  return obj;
+}
+
+// 修改 sendToFeishu，传递对象数据
 function sendToFeishu() {
   const type = typeSelect.value;
   const orderInput = orderNo.value.trim();
@@ -725,6 +736,9 @@ function sendToFeishu() {
     showToast("链接中未找到单号数字", "warning");
     return;
   }
+  // 获取预览区内容并转为对象
+  const previewText = preview.innerText.trim();
+  const cardData = markdownTableToObject(previewText);
   const cardTitle = `更换通知 - ${type}`;
   fetch("https://pdabot-worker.jsjs.net/api/send-card", {
     method: "POST",
@@ -734,7 +748,8 @@ function sendToFeishu() {
     body: JSON.stringify({
       title: cardTitle,
       orderNo: orderNum,
-      chatId: chatId
+      chatId: chatId,
+      data: cardData // 传递对象数据
     }),
   })
     .then(async (res) => {
