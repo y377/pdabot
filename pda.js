@@ -206,6 +206,9 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     // 页面加载时自动填充群列表
     loadChatList();
+
+    // 页面初始化时，主动刷新一次预览
+    update();
   } catch (error) {
     console.error('页面初始化失败:', error);
   }
@@ -737,8 +740,7 @@ function sendToFeishu() {
   fetch("https://pdabot-worker.jsjs.net/api/send-card", {
     method: "POST",
     headers: {
-      "Content-Type": "application/json",
-      "Authorization": `Bearer ${localStorage.getItem('accessToken')}` // 添加token
+      "Content-Type": "application/json"
     },
     body: JSON.stringify({
       title: cardTitle,
