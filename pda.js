@@ -40,7 +40,6 @@ orderNo.addEventListener("input", function () {
 function showToast(msg, type = "primary", delay = 5000) {
   const container = document.getElementById("toastContainer");
   if (!container) {
-    console.error('未找到提示框容器');
     return;
   }
 
@@ -127,7 +126,6 @@ function showMainUI() {
   const mainContainer = document.getElementById('mainContainer');
   
   if (!loginContainer || !mainContainer) {
-    console.error('未找到登录或主界面容器');
     return;
   }
 
@@ -139,7 +137,6 @@ function showLoginUI() {
   const loginContainer = document.getElementById('loginContainer');
   const mainContainer = document.getElementById('mainContainer');
   if (!loginContainer || !mainContainer) {
-    console.error('未找到登录或主界面容器');
     return;
   }
   loginContainer.classList.remove('d-none');
@@ -181,7 +178,6 @@ async function mainInit() {
     };
     // 检查必要的元素是否存在
     if (!elements.orderNo || !elements.typeSelect) {
-      console.error('未找到必要的界面元素');
       return;
     }
     // 更新品牌选项
@@ -196,8 +192,6 @@ async function mainInit() {
     }
     // 检查登录状态
     checkLogin();
-    // 页面加载时自动填充群列表
-    loadChatList();
   } catch (error) {
     console.error('页面初始化失败:', error);
   }
@@ -300,13 +294,11 @@ async function loadFormData() {
       
       // 确保数据存在
       if (!window.partsData || !window.partsData.brandMap) {
-        console.warn('partsData 未加载完成');
         return;
       }
       
       // 确保当前类型在 brandMap 中存在
       if (!window.partsData.brandMap[typeVal]) {
-        console.warn(`类型 ${typeVal} 在 brandMap 中不存在`);
         return;
       }
       
@@ -687,21 +679,6 @@ function update() {
   }
   hljs.highlightElement(preview);
   saveFormData();
-}
-
-// 页面加载时自动拉取群列表
-async function loadChatList() {
-  try {
-    const res = await fetch('https://pdabot-worker.jsjs.net/api/chat-list');
-    const data = await res.json();
-    const chatList = (data.data && data.data.items) ? data.data.items : [];
-    const chatSelect = document.getElementById('chatSelect');
-    chatSelect.innerHTML = '<option value="">请选择群</option>' + chatList.map(
-      c => `<option value="${c.chat_id}">${c.name}</option>`
-    ).join('');
-  } catch (e) {
-    showToast('群列表加载失败', 'danger');
-  }
 }
 
 // 新增：将Markdown表格转为对象
