@@ -80,6 +80,9 @@
           userInfoElement.className = 'text-end text-muted small';
           userInfoElement.innerHTML = `当前用户: ${data.data.name}`;
           document.querySelector('h5').appendChild(userInfoElement);
+
+          // 加载群列表
+          loadChatList();
         } else {
           throw new Error(data.msg || '免登录失败');
         }
@@ -116,12 +119,82 @@
           userInfoElement.innerHTML = `当前用户: ${userName}`;
           document.querySelector('h5').appendChild(userInfoElement);
         }
+        // 加载群列表
+        loadChatList();
       } else {
         console.log('未登录，尝试飞书客户端内免登录');
         // 尝试飞书客户端内免登录
         initFeishuAuth();
       }
     });
+
+    // 初始化登录组件
+    function initLoginComponent() {
+      // 检查是否在飞书客户端内
+      const isFeishuClient = /Lark|Feishu/.test(navigator.userAgent) && window.tt;
+      if (isFeishuClient) {
+        console.log('在飞书客户端内，跳过二维码登录初始化');
+        return;
+      }
+
+      var client_id = 'cli_a8be137e6579500b';
+      var redirect_uri = encodeURIComponent('https://pdabot.jsjs.net/');
+      var state = Math.random().toString(36).slice(2);
+      var goto = `https://passport.feishu.cn/suite/passport/oauth/authorize?client_id=${client_id}&redirect_uri=${redirect_uri}&response_type=code&state=${state}`;
+      var QRLoginObj = QRLogin({
+        id: "login_container",
+        goto: goto,
+        width: "300",
+        height: "300"
+      });
+      var handleMessage = function (event) {
+        if (QRLoginObj.matchOrigin(event.origin) && QRLoginObj.matchData(event.data)) {
+          var loginTmpCode = event.data.tmp_code;
+          window.location.href = `${goto}&tmp_code=${loginTmpCode}`;
+        }
+      };
+      window.addEventListener('message', handleMessage, false);
+    }
+
+    // 初始化登录组件
+    initLoginComponent();
+
+    async function loadChatList() {
+      try {
+        // 检查是否已登录
+        const isLoggedIn = localStorage.getItem('isLoggedIn') === 'true';
+        if (!isLoggedIn) {
+          console.log('未登录，跳过加载群列表');
+          return;
+        }
+
+        const userId = localStorage.getItem('userId');
+        if (!userId) {
+          console.log('未找到用户ID，跳过加载群列表');
+          return;
+        }
+
+        const res = await fetch('https://pdabot-worker.jsjs.net/api/chat-list', {
+          headers: {
+            'Authorization': `Bearer ${userId}`
+          }
+        });
+        const data = await res.json();
+        if (data.code === 401) {
+          console.log('未授权访问群列表');
+          return;
+        }
+        const chatList = (data.data && data.data.items) ? data.data.items : [];
+        const chatSelect = document.getElementById('chatSelect');
+        chatSelect.innerHTML = '<option value="">请选择群</option>' + chatList.map(
+          c => `<option value="${c.chat_id}">${c.name}</option>`
+        ).join('');
+      } catch (e) {
+        console.error('群列表加载失败:', e);
+        showToast('群列表加载失败', 'danger');
+      }
+    }
+    document.addEventListener('DOMContentLoaded', loadChatList);
   </script>
 </head>
 
