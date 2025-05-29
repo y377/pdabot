@@ -120,17 +120,53 @@ function waitForData() {
   });
 }
 
+// 登录回调统一处理
+async function handleLoginCallback({ code, type }) {
+  let url = '';
+  if (type === 'scan') {
+    url = 'https://login-pda.jsjs.net/auth';
+  } else if (type === 'feishu') {
+    url = 'https://pdabot.jsjs.net/auth/feishu';
+  }
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ code })
+  });
+  const data = await res.json();
+  if (data.code === 0) {
+    localStorage.setItem('isLoggedIn', 'true');
+    localStorage.setItem('userId', data.data.open_id);
+    localStorage.setItem('userName', data.data.name);
+    showMainUI(data.data.name);
+    loadChatList();
+  } else {
+    showToast('登录失败', 'danger');
+    showLoginUI();
+  }
+}
+
+// 扫码登录回调
+async function handleFeishuCallback(code) {
+  await handleLoginCallback({ code, type: 'scan' });
+}
+
+// APP免密登录回调
+async function handleFeishuAuthCallback(code) {
+  await handleLoginCallback({ code, type: 'feishu' });
+}
+
 // 修改 showMainUI 函数
-function showMainUI() {
+function showMainUI(userName) {
   const loginContainer = document.getElementById('loginContainer');
   const mainContainer = document.getElementById('mainContainer');
-  
-  if (!loginContainer || !mainContainer) {
-    return;
-  }
-
+  if (!loginContainer || !mainContainer) return;
   loginContainer.classList.add('d-none');
   mainContainer.classList.remove('d-none');
+  const userInfoElement = document.createElement('div');
+  userInfoElement.className = 'text-end text-muted small';
+  userInfoElement.textContent = `当前用户: ${userName}`;
+  document.querySelector('h5').appendChild(userInfoElement);
 }
 
 function showLoginUI() {
@@ -227,7 +263,7 @@ function checkLogin() {
       if (isLoggedIn && userId && userName) {
         // 已登录，显示主界面
         currentUser = { id: userId, name: userName };
-        showMainUI();
+        showMainUI(userName);
       } else {
         // 未登录，显示登录界面
         showLoginUI();
@@ -235,40 +271,6 @@ function checkLogin() {
     }
   } catch (error) {
     console.error('检查登录状态失败:', error);
-    showLoginUI();
-  }
-}
-
-// 修改 handleFeishuCallback 函数
-async function handleFeishuCallback(code) {
-  try {
-    const res = await fetch('https://login-pda.jsjs.net/auth', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ 
-        code,
-        redirect_uri: 'https://pdabot.jsjs.net/'
-      })
-    });
-    const data = await res.json();
-    if (data.code === 0) {
-      currentUser = data.data;
-      // 保存登录状态到 localStorage
-      localStorage.setItem('isLoggedIn', 'true');
-      localStorage.setItem('userId', currentUser.open_id || currentUser.user_id || currentUser.id || '');
-      localStorage.setItem('userName', currentUser.name);
-      // 清除 URL 中的 code 参数
-      window.history.replaceState({}, '', '/');
-      showToast(`欢迎，${currentUser.name}`, 'success');
-      // 显示主界面
-      showMainUI();
-    } else {
-      showToast('登录失败', 'danger');
-      showLoginUI();
-    }
-  } catch (error) {
-    console.error('登录失败:', error);
-    showToast('登录失败', 'danger');
     showLoginUI();
   }
 }
