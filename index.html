@@ -33,6 +33,12 @@
     function log(msg) {
       const el = document.getElementById('debug-log');
       if (el) el.textContent += (typeof msg === 'string' ? msg : JSON.stringify(msg)) + '\n';
+      // 控制台也输出，便于开发调试
+      if (typeof msg === 'string') {
+        console.log('[debug-log]', msg);
+      } else {
+        console.log('[debug-log]', JSON.stringify(msg));
+      }
     }
 
     // 检查是否在飞书客户端内
@@ -41,7 +47,7 @@
       const inFeishu = /Lark|Feishu/.test(ua);
       log('userAgent: ' + ua);
       log('isInFeishuClient: ' + inFeishu);
-      log('window.tt: ' + (typeof window.tt));
+      log('window.tt: ' + (typeof window.tt) + ', window.tt.requestAccess: ' + (typeof window.tt?.requestAccess) + ', window.tt.requestAuthCode: ' + (typeof window.tt?.requestAuthCode));
       return inFeishu && typeof window.tt !== 'undefined';
     }
 
@@ -252,14 +258,18 @@
         if (isLoggedIn && userName) {
           log('已登录，直接显示主界面');
           showMainUI(userName);
-        } else {
-          log('未登录，尝试免登');
+        } else if (isInFeishuClient()) {
+          log('在飞书客户端内，尝试免登');
           const autoLoginSuccess = await initFeishuAuth();
           if (!autoLoginSuccess) {
             log('免登失败，显示扫码登录');
             showLoginUI();
             initQRLogin();
           }
+        } else {
+          log('非飞书客户端，直接显示扫码登录');
+          showLoginUI();
+          initQRLogin();
         }
       }
     });
