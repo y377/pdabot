@@ -147,14 +147,79 @@ async function handleLoginCallback({ code, type }) {
   }
 }
 
-// 扫码登录回调
+// 修改 redirectToFeishuLogin 函数
+function redirectToFeishuLogin() {
+  const client_id = 'cli_a8be137e6579500b';
+  const redirect_uri = encodeURIComponent('https://pdabot.jsjs.net/');
+  const state = Math.random().toString(36).slice(2);
+  const url = `https://passport.feishu.cn/suite/passport/oauth/authorize?client_id=${client_id}&redirect_uri=${redirect_uri}&response_type=code&state=${state}`;
+  window.location.href = url;
+}
+
+// 修改 checkLogin 函数
+function checkLogin() {
+  try {
+    const urlParams = new URLSearchParams(window.location.search);
+    const code = urlParams.get('code');
+    const state = urlParams.get('state');
+    
+    if (code) {
+      // 有 code 参数，说明是飞书登录回调
+      console.log('检测到登录回调，code:', code);
+      // 根据 state 判断是扫码还是免密登录
+      if (state === 'scan') {
+        handleFeishuCallback(code);
+      } else {
+        handleFeishuAuthCallback(code);
+      }
+    } else {
+      // 检查 localStorage 中的登录状态
+      const isLoggedIn = localStorage.getItem('isLoggedIn') === 'true';
+      const userId = localStorage.getItem('userId');
+      const userName = localStorage.getItem('userName');
+      
+      if (isLoggedIn && userId && userName) {
+        // 已登录，显示主界面
+        currentUser = { id: userId, name: userName };
+        showMainUI(userName);
+        loadChatList();
+      } else {
+        // 未登录，显示登录界面
+        showLoginUI();
+      }
+    }
+  } catch (error) {
+    console.error('检查登录状态失败:', error);
+    showLoginUI();
+  }
+}
+
+// 修改扫码登录回调
 async function handleFeishuCallback(code) {
   if (!code) {
     showToast('登录失败：缺少授权码', 'danger');
     return;
   }
   try {
-    await handleLoginCallback({ code, type: 'scan' });
+    console.log('开始扫码登录，code:', code);
+    const res = await fetch('https://pdabot.jsjs.net/auth/scan', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ code })
+    });
+    const data = await res.json();
+    console.log('扫码登录响应:', data);
+    if (data.code === 0) {
+      localStorage.setItem('isLoggedIn', 'true');
+      localStorage.setItem('userId', data.data.open_id);
+      localStorage.setItem('userName', data.data.name);
+      currentUser = { id: data.data.open_id, name: data.data.name };
+      showMainUI(data.data.name);
+      loadChatList();
+    } else {
+      showToast(`登录失败: ${data.msg || '未知错误'}`, 'danger');
+      showLoginUI();
+    }
   } catch (error) {
     console.error('扫码登录失败:', error);
     showToast('扫码登录失败', 'danger');
@@ -162,14 +227,32 @@ async function handleFeishuCallback(code) {
   }
 }
 
-// APP免密登录回调
+// 修改免密登录回调
 async function handleFeishuAuthCallback(code) {
   if (!code) {
     showToast('登录失败：缺少授权码', 'danger');
     return;
   }
   try {
-    await handleLoginCallback({ code, type: 'feishu' });
+    console.log('开始免密登录，code:', code);
+    const res = await fetch('https://pdabot.jsjs.net/auth/feishu', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ code })
+    });
+    const data = await res.json();
+    console.log('免密登录响应:', data);
+    if (data.code === 0) {
+      localStorage.setItem('isLoggedIn', 'true');
+      localStorage.setItem('userId', data.data.open_id);
+      localStorage.setItem('userName', data.data.name);
+      currentUser = { id: data.data.open_id, name: data.data.name };
+      showMainUI(data.data.name);
+      loadChatList();
+    } else {
+      showToast(`登录失败: ${data.msg || '未知错误'}`, 'danger');
+      showLoginUI();
+    }
   } catch (error) {
     console.error('免密登录失败:', error);
     showToast('免密登录失败', 'danger');
@@ -277,48 +360,6 @@ if (!window.partsData || !window.partsData.brandMap) {
 } else {
   // 已经加载好，直接初始化
   document.addEventListener('DOMContentLoaded', mainInit);
-}
-
-// 修改 checkLogin 函数
-function checkLogin() {
-  try {
-    const urlParams = new URLSearchParams(window.location.search);
-    const code = urlParams.get('code');
-    const state = urlParams.get('state');
-    
-    if (code) {
-      // 有 code 参数，说明是飞书登录回调
-      console.log('检测到登录回调，code:', code);
-      handleFeishuCallback(code);
-    } else {
-      // 检查 localStorage 中的登录状态
-      const isLoggedIn = localStorage.getItem('isLoggedIn') === 'true';
-      const userId = localStorage.getItem('userId');
-      const userName = localStorage.getItem('userName');
-      
-      if (isLoggedIn && userId && userName) {
-        // 已登录，显示主界面
-        currentUser = { id: userId, name: userName };
-        showMainUI(userName);
-        loadChatList();
-      } else {
-        // 未登录，显示登录界面
-        showLoginUI();
-      }
-    }
-  } catch (error) {
-    console.error('检查登录状态失败:', error);
-    showLoginUI();
-  }
-}
-
-// 修改 redirectToFeishuLogin 函数
-function redirectToFeishuLogin() {
-  const client_id = 'cli_a8be137e6579500b';
-  const redirect_uri = encodeURIComponent('https://pdabot.jsjs.net/');
-  const state = Math.random().toString(36).slice(2);
-  const url = `https://passport.feishu.cn/suite/passport/oauth/authorize?client_id=${client_id}&redirect_uri=${redirect_uri}&response_type=code&state=${state}`;
-  window.location.href = url;
 }
 
 // 修改 loadFormData 函数
