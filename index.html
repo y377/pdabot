@@ -42,16 +42,21 @@
       }
 
       try {
-        // 初始化飞书JSAPI
         await tt.ready();
         console.log('飞书JSAPI初始化成功');
-        
-        // 获取用户信息
-        const userInfo = await tt.getUserInfo();
-        console.log('获取到的用户信息:', userInfo);
-        
-        if (!userInfo || !userInfo.openId) {
-          throw new Error('获取用户信息失败: ' + JSON.stringify(userInfo));
+
+        // 获取预授权码
+        const preAuthRes = await new Promise((resolve, reject) => {
+          tt.getLoginPreAuthCode({
+            appId: FEISHU_CONFIG.client_id,
+            success: resolve,
+            fail: reject
+          });
+        });
+        console.log('获取到预授权码:', preAuthRes);
+
+        if (!preAuthRes || !preAuthRes.code) {
+          throw new Error('获取预授权码失败: ' + JSON.stringify(preAuthRes));
         }
 
         // 调用后端免登录接口
@@ -59,20 +64,17 @@
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            open_id: userInfo.openId
+            pre_auth_code: preAuthRes.code
           })
         });
 
         const data = await response.json();
         console.log('免登录接口返回:', data);
-        
+
         if (data.code === 0) {
-          // 登录成功，保存用户信息
           localStorage.setItem('isLoggedIn', 'true');
           localStorage.setItem('userId', data.data.open_id);
           localStorage.setItem('userName', data.data.name);
-          
-          // 切换到主界面
           showMainUI(data.data.name);
           return true;
         } else {
