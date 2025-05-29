@@ -25,17 +25,30 @@
   <script>
     // 飞书客户端内免登录
     async function initFeishuAuth() {
-      const isFeishuClient = /Lark|Feishu/.test(navigator.userAgent);
-      if (!isFeishuClient) return;
+      // 更严格的飞书客户端检测
+      const isFeishuClient = /Lark|Feishu/.test(navigator.userAgent) && window.tt;
+      console.log('当前环境:', {
+        userAgent: navigator.userAgent,
+        isFeishuClient: isFeishuClient,
+        tt: !!window.tt
+      });
+
+      if (!isFeishuClient) {
+        console.log('非飞书客户端环境，跳过免登录');
+        return;
+      }
 
       try {
         // 初始化飞书JSAPI
         await tt.ready();
+        console.log('飞书JSAPI初始化成功');
         
         // 获取用户信息
         const userInfo = await tt.getUserInfo();
+        console.log('获取到的用户信息:', userInfo);
+        
         if (!userInfo || !userInfo.openId) {
-          throw new Error('获取用户信息失败');
+          throw new Error('获取用户信息失败: ' + JSON.stringify(userInfo));
         }
 
         // 调用后端免登录接口
@@ -50,6 +63,8 @@
         });
 
         const data = await response.json();
+        console.log('免登录接口返回:', data);
+        
         if (data.code === 0) {
           // 登录成功，保存用户信息
           localStorage.setItem('isLoggedIn', 'true');
@@ -86,9 +101,11 @@
 
     // 页面加载完成后初始化飞书认证
     document.addEventListener('DOMContentLoaded', function() {
+      console.log('页面加载完成，开始初始化');
       // 检查是否已登录
       const isLoggedIn = localStorage.getItem('isLoggedIn') === 'true';
       if (isLoggedIn) {
+        console.log('检测到已登录状态');
         document.getElementById('loginContainer').classList.add('d-none');
         document.getElementById('mainContainer').classList.remove('d-none');
         // 显示用户信息
@@ -100,6 +117,7 @@
           document.querySelector('h5').appendChild(userInfoElement);
         }
       } else {
+        console.log('未登录，尝试飞书客户端内免登录');
         // 尝试飞书客户端内免登录
         initFeishuAuth();
       }
@@ -319,14 +337,36 @@
 
     async function loadChatList() {
       try {
-        const res = await fetch('https://pdabot-worker.jsjs.net/api/chat-list');
+        // 检查是否已登录
+        const isLoggedIn = localStorage.getItem('isLoggedIn') === 'true';
+        if (!isLoggedIn) {
+          console.log('未登录，跳过加载群列表');
+          return;
+        }
+
+        const userId = localStorage.getItem('userId');
+        if (!userId) {
+          console.log('未找到用户ID，跳过加载群列表');
+          return;
+        }
+
+        const res = await fetch('https://pdabot-worker.jsjs.net/api/chat-list', {
+          headers: {
+            'Authorization': `Bearer ${userId}`
+          }
+        });
         const data = await res.json();
+        if (data.code === 401) {
+          console.log('未授权访问群列表');
+          return;
+        }
         const chatList = (data.data && data.data.items) ? data.data.items : [];
         const chatSelect = document.getElementById('chatSelect');
         chatSelect.innerHTML = '<option value="">请选择群</option>' + chatList.map(
           c => `<option value="${c.chat_id}">${c.name}</option>`
         ).join('');
       } catch (e) {
+        console.error('群列表加载失败:', e);
         showToast('群列表加载失败', 'danger');
       }
     }
