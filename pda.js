@@ -124,7 +124,7 @@ function waitForData() {
 async function handleLoginCallback({ code, type }) {
   let url = '';
   if (type === 'scan') {
-    url = 'https://login-pda.jsjs.net/auth';
+    url = 'https://pdabot.jsjs.net/auth/scan';
   } else if (type === 'feishu') {
     url = 'https://pdabot.jsjs.net/auth/feishu';
   }
@@ -138,7 +138,7 @@ async function handleLoginCallback({ code, type }) {
     localStorage.setItem('isLoggedIn', 'true');
     localStorage.setItem('userId', data.data.open_id);
     localStorage.setItem('userName', data.data.name);
-    currentUser = { id: data.data.open_id, name: data.data.name }; // 同步赋值
+    currentUser = { id: data.data.open_id, name: data.data.name };
     showMainUI(data.data.name);
     loadChatList();
   } else {
@@ -785,7 +785,7 @@ function sendToFeishu() {
     chatId: chatId,
     data: data
   }));
-  fetch("https://pdabot-worker.jsjs.net/api/send-card", {
+  fetch("https://pdabot.jsjs.net/api/send-card", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -839,7 +839,7 @@ function sendApplyNotify() {
     showToast('旧件品牌、旧件SN、旧件PN均为必填项', 'warning');
     return;
   }
-  fetch('https://test.jsjs.net', {
+  fetch('https://pdabot.jsjs.net/api/apply', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
