@@ -149,12 +149,32 @@ async function handleLoginCallback({ code, type }) {
 
 // 扫码登录回调
 async function handleFeishuCallback(code) {
-  await handleLoginCallback({ code, type: 'scan' });
+  if (!code) {
+    showToast('登录失败：缺少授权码', 'danger');
+    return;
+  }
+  try {
+    await handleLoginCallback({ code, type: 'scan' });
+  } catch (error) {
+    console.error('扫码登录失败:', error);
+    showToast('扫码登录失败', 'danger');
+    showLoginUI();
+  }
 }
 
 // APP免密登录回调
 async function handleFeishuAuthCallback(code) {
-  await handleLoginCallback({ code, type: 'feishu' });
+  if (!code) {
+    showToast('登录失败：缺少授权码', 'danger');
+    return;
+  }
+  try {
+    await handleLoginCallback({ code, type: 'feishu' });
+  } catch (error) {
+    console.error('免密登录失败:', error);
+    showToast('免密登录失败', 'danger');
+    showLoginUI();
+  }
 }
 
 // 修改 showMainUI 函数
@@ -264,9 +284,11 @@ function checkLogin() {
   try {
     const urlParams = new URLSearchParams(window.location.search);
     const code = urlParams.get('code');
+    const state = urlParams.get('state');
     
     if (code) {
       // 有 code 参数，说明是飞书登录回调
+      console.log('检测到登录回调，code:', code);
       handleFeishuCallback(code);
     } else {
       // 检查 localStorage 中的登录状态
@@ -276,7 +298,7 @@ function checkLogin() {
       
       if (isLoggedIn && userId && userName) {
         // 已登录，显示主界面
-        currentUser = { id: userId, name: userName }; // 同步赋值
+        currentUser = { id: userId, name: userName };
         showMainUI(userName);
         loadChatList();
       } else {
