@@ -124,36 +124,40 @@
       window.addEventListener('message', handleMessage, false);
     }
 
-    // 处理飞书登录回调
-    async function handleFeishuCallback(code) {
-      try {
-        const res = await fetch('https://pdabot.jsjs.net/auth', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            code,
-            redirect_uri: FEISHU_CONFIG.redirect_uri
-          })
-        });
-        const data = await res.json();
-        if (data.code === 0) {
-          // 保存登录状态到 localStorage
-          localStorage.setItem('isLoggedIn', 'true');
-          localStorage.setItem('userId', data.data.open_id);
-          localStorage.setItem('userName', data.data.name);
-          // 清除 URL 中的 code 参数
-          window.history.replaceState({}, '', '/');
-          showToast(`欢迎，${data.data.name}`, 'success');
-          // 显示主界面
-          showMainUI(data.data.name);
-        } else {
-          throw new Error(data.msg || '登录失败');
-        }
-      } catch (error) {
-        console.error('登录失败:', error);
-        showToast('登录失败: ' + error.message, 'danger');
+    // 登录回调统一处理
+    async function handleLoginCallback({ code, type }) {
+      let url = '';
+      if (type === 'scan') {
+        url = 'https://login-pda.jsjs.net/auth';
+      } else if (type === 'feishu') {
+        url = 'https://pdabot.jsjs.net/auth/feishu';
+      }
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ code })
+      });
+      const data = await res.json();
+      if (data.code === 0) {
+        localStorage.setItem('isLoggedIn', 'true');
+        localStorage.setItem('userId', data.data.open_id);
+        localStorage.setItem('userName', data.data.name);
+        showMainUI(data.data.name);
+        loadChatList();
+      } else {
+        showToast('登录失败', 'danger');
         showLoginUI();
       }
+    }
+
+    // 扫码登录回调
+    async function handleFeishuCallback(code) {
+      await handleLoginCallback({ code, type: 'scan' });
+    }
+
+    // APP免密登录回调
+    async function handleFeishuAuthCallback(code) {
+      await handleLoginCallback({ code, type: 'feishu' });
     }
 
     // 加载群列表
@@ -195,15 +199,10 @@
     function showMainUI(userName) {
       document.getElementById('loginContainer').classList.add('d-none');
       document.getElementById('mainContainer').classList.remove('d-none');
-
-      // 显示用户信息
       const userInfoElement = document.createElement('div');
       userInfoElement.className = 'text-end text-muted small';
       userInfoElement.textContent = `当前用户: ${userName}`;
       document.querySelector('h5').appendChild(userInfoElement);
-
-      // 加载群列表
-      loadChatList();
     }
 
     // 显示登录界面
@@ -223,6 +222,7 @@
         const userName = localStorage.getItem('userName');
         if (isLoggedIn && userName) {
           showMainUI(userName);
+          loadChatList();
         } else if (isInFeishuClient()) {
           const autoLoginSuccess = await initFeishuAuth();
           if (!autoLoginSuccess) {
