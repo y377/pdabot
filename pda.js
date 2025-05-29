@@ -138,6 +138,7 @@ async function handleLoginCallback({ code, type }) {
     localStorage.setItem('isLoggedIn', 'true');
     localStorage.setItem('userId', data.data.open_id);
     localStorage.setItem('userName', data.data.name);
+    currentUser = { id: data.data.open_id, name: data.data.name }; // 同步赋值
     showMainUI(data.data.name);
     loadChatList();
   } else {
@@ -163,10 +164,23 @@ function showMainUI(userName) {
   if (!loginContainer || !mainContainer) return;
   loginContainer.classList.add('d-none');
   mainContainer.classList.remove('d-none');
-  const userInfoElement = document.createElement('div');
-  userInfoElement.className = 'text-end text-muted small';
-  userInfoElement.textContent = `当前用户: ${userName}`;
-  document.querySelector('h5').appendChild(userInfoElement);
+  const h5 = document.querySelector('h5');
+  // 先移除旧的用户信息元素
+  const oldUserInfo = h5.querySelector('.user-info-tooltip');
+  if (oldUserInfo) oldUserInfo.remove();
+  // 新增：用户名用带Tooltips的图标按钮显示
+  const userInfoBtn = document.createElement('button');
+  userInfoBtn.type = 'button';
+  userInfoBtn.className = 'btn btn-sm btn-outline-secondary ms-2 user-info-tooltip';
+  userInfoBtn.setAttribute('data-bs-toggle', 'tooltip');
+  userInfoBtn.setAttribute('data-bs-placement', 'bottom');
+  userInfoBtn.setAttribute('title', userName);
+  userInfoBtn.innerHTML = '<i class="bi bi-person-circle"></i>';
+  h5.appendChild(userInfoBtn);
+  // 初始化Tooltips
+  if (window.bootstrap) {
+    new bootstrap.Tooltip(userInfoBtn);
+  }
 }
 
 function showLoginUI() {
@@ -262,8 +276,9 @@ function checkLogin() {
       
       if (isLoggedIn && userId && userName) {
         // 已登录，显示主界面
-        currentUser = { id: userId, name: userName };
+        currentUser = { id: userId, name: userName }; // 同步赋值
         showMainUI(userName);
+        loadChatList();
       } else {
         // 未登录，显示登录界面
         showLoginUI();
@@ -939,5 +954,40 @@ function resetForm() {
         cache.delete('https://pn.jsjs.net/pn');
       });
     }
+  }
+}
+
+// 新增：加载群列表
+async function loadChatList() {
+  const userId = localStorage.getItem('userId');
+  if (!userId) {
+    showToast('未登录，无法获取群列表', 'warning');
+    return;
+  }
+  try {
+    const res = await fetch('https://pdabot.jsjs.net/api/chat-list', {
+      headers: {
+        'Authorization': 'Bearer ' + userId
+      }
+    });
+    const data = await res.json();
+    if (data.code === 401) {
+      showToast('未授权访问群列表', 'danger');
+      return;
+    }
+    if (data.code === 0 && data.data && data.data.items) {
+      const chatSelect = document.getElementById('chatSelect');
+      if (chatSelect) {
+        chatSelect.innerHTML = '<option value="">请选择要发送的群</option>' + 
+          data.data.items.map(chat => 
+            `<option value="${chat.chat_id}">${chat.name}</option>`
+          ).join('');
+      }
+    } else {
+      showToast('群列表数据格式错误', 'warning');
+    }
+  } catch (e) {
+    console.error('加载群列表失败:', e);
+    showToast('群列表加载失败', 'danger');
   }
 } 
