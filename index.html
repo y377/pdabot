@@ -13,7 +13,6 @@
   <link crossorigin="anonymous" href="https://lib.baomitu.com/bootstrap-icons/1.11.3/font/bootstrap-icons.min.css" rel="stylesheet" />
   <link crossorigin="anonymous" href="https://lib.baomitu.com/highlight.js/11.10.0/styles/github-dark.css" rel="stylesheet" />
   <link crossorigin="anonymous" href="/icons/icon-144x144.png" rel="apple-touch-icon" />
-  <script src="https://lf-package-cn.feishucdn.com/obj/feishu-static/lark/passport/qrcode/LarkSSOSDKWebQRCode-1.0.3.js"></script>
   <script type="text/javascript" src="https://lf-scm-cn.feishucdn.com/lark/op/h5-js-sdk-1.5.38.js"></script>
   <script>
     // 飞书登录相关功能
@@ -23,24 +22,11 @@
     };
 
     const FEISHU_APP_ID = 'cli_a8be137e6579500b'; // 替换为你的AppID
-    function log(msg) {
-      const el = document.getElementById('debug-log');
-      if (el) el.textContent += (typeof msg === 'string' ? msg : JSON.stringify(msg)) + '\n';
-      // 控制台也输出，便于开发调试
-      if (typeof msg === 'string') {
-        console.log('[debug-log]', msg);
-      } else {
-        console.log('[debug-log]', JSON.stringify(msg));
-      }
-    }
 
     // 检查是否在飞书客户端内
     function isInFeishuClient() {
       const ua = navigator.userAgent;
       const inFeishu = /Lark|Feishu/.test(ua);
-      log('userAgent: ' + ua);
-      log('isInFeishuClient: ' + inFeishu);
-      log('window.tt: ' + (typeof window.tt) + ', window.tt.requestAccess: ' + (typeof window.tt?.requestAccess) + ', window.tt.requestAuthCode: ' + (typeof window.tt?.requestAuthCode));
       return inFeishu && typeof window.tt !== 'undefined';
     }
 
@@ -48,17 +34,14 @@
     async function getFeishuPreAuthCode() {
       return new Promise((resolve, reject) => {
         if (window.tt && typeof window.tt.requestAccess === 'function') {
-          log('调用 window.tt.requestAccess');
           window.tt.requestAccess({
             appID: FEISHU_APP_ID,
             scopeList: [],
             state: 'myContext',
             success: (res) => {
-              log('requestAccess success: ' + JSON.stringify(res));
               resolve(res.code);
             },
             fail: (error) => {
-              log('requestAccess fail: ' + JSON.stringify(error));
               if (error.errno === 103) {
                 callRequestAuthCode(resolve, reject);
               } else {
@@ -67,41 +50,33 @@
             }
           });
         } else {
-          log('window.tt.requestAccess 不存在，降级调用 requestAuthCode');
           callRequestAuthCode(resolve, reject);
         }
       });
     }
     function callRequestAuthCode(resolve, reject) {
       if (window.tt && typeof window.tt.requestAuthCode === 'function') {
-        log('调用 window.tt.requestAuthCode');
         window.tt.requestAuthCode({
           appId: FEISHU_APP_ID,
           success: (res) => {
-            log('requestAuthCode success: ' + JSON.stringify(res));
             resolve(res.code);
           },
           fail: (error) => {
-            log('requestAuthCode fail: ' + JSON.stringify(error));
             reject(error);
           }
         });
       } else {
-        log('window.tt.requestAuthCode 不存在，JSAPI不可用');
         reject({ errno: 999, errString: 'JSAPI不可用' });
       }
     }
 
     // 飞书客户端内免登录
     async function initFeishuAuth() {
-      log('initFeishuAuth called');
       if (!/Lark|Feishu/.test(navigator.userAgent) || typeof window.tt === 'undefined') {
-        log('非飞书客户端环境，跳过免登录');
         return false;
       }
       try {
         const code = await getFeishuPreAuthCode();
-        log('获取到预授权码: ' + code);
         // 调用后端免登录接口
         const response = await fetch('/auth/feishu', {
           method: 'POST',
@@ -109,19 +84,16 @@
           body: JSON.stringify({ code })
         });
         const data = await response.json();
-        log('免登录接口返回: ' + JSON.stringify(data));
         if (data.code === 0) {
           localStorage.setItem('isLoggedIn', 'true');
           localStorage.setItem('userId', data.data.open_id);
           localStorage.setItem('userName', data.data.name);
           showMainUI(data.data.name);
-          log('免登录成功，已切换主界面');
           return true;
         } else {
           throw new Error(data.msg || '免登录失败');
         }
       } catch (error) {
-        log('免登录失败: ' + (error.errString || error.message));
         showToast('免登录失败: ' + (error.errString || error.message), 'danger');
         return false;
       }
@@ -130,7 +102,6 @@
     // 初始化二维码登录
     function initQRLogin() {
       if (isInFeishuClient()) {
-        console.log('在飞书客户端内，跳过二维码登录初始化');
         return;
       }
 
@@ -156,7 +127,7 @@
     // 处理飞书登录回调
     async function handleFeishuCallback(code) {
       try {
-        const res = await fetch('https://login-pda.jsjs.net/auth', {
+        const res = await fetch('https://pdabot.jsjs.net/auth', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -190,27 +161,32 @@
       try {
         const userId = localStorage.getItem('userId');
         if (!userId) {
-          console.log('未找到用户ID，跳过加载群列表');
           return;
         }
 
-        const res = await fetch('https://pdabot-worker.jsjs.net/api/chat-list', {
+        const res = await fetch('https://pdabot.jsjs.net/api/chat-list', {
           headers: {
-            'Authorization': `Bearer ${userId}`
+            'Authorization': 'Bearer test'
           }
         });
         const data = await res.json();
         if (data.code === 401) {
-          console.log('未授权访问群列表');
           return;
         }
         const chatList = (data.data && data.data.items) ? data.data.items : [];
         const chatSelect = document.getElementById('chatSelect');
-        chatSelect.innerHTML = '<option value="">请选择群</option>' + chatList.map(
-          c => `<option value="${c.chat_id}">${c.name}</option>`
-        ).join('');
+        chatSelect.replaceChildren();
+        const defaultOption = document.createElement('option');
+        defaultOption.value = '';
+        defaultOption.textContent = '请选择群';
+        chatSelect.appendChild(defaultOption);
+        chatList.forEach(c => {
+          const option = document.createElement('option');
+          option.value = c.chat_id;
+          option.textContent = c.name;
+          chatSelect.appendChild(option);
+        });
       } catch (e) {
-        console.error('群列表加载失败:', e);
         showToast('群列表加载失败', 'danger');
       }
     }
@@ -223,7 +199,7 @@
       // 显示用户信息
       const userInfoElement = document.createElement('div');
       userInfoElement.className = 'text-end text-muted small';
-      userInfoElement.innerHTML = `当前用户: ${userName}`;
+      userInfoElement.textContent = `当前用户: ${userName}`;
       document.querySelector('h5').appendChild(userInfoElement);
 
       // 加载群列表
@@ -238,29 +214,22 @@
 
     // 页面加载完成后初始化
     document.addEventListener('DOMContentLoaded', async function () {
-      log('页面加载完成，开始初始化');
       const urlParams = new URLSearchParams(window.location.search);
       const code = urlParams.get('code');
       if (code) {
-        log('检测到 code 参数，走 handleFeishuCallback');
         await handleFeishuCallback(code);
       } else {
         const isLoggedIn = localStorage.getItem('isLoggedIn') === 'true';
         const userName = localStorage.getItem('userName');
-        log('isLoggedIn: ' + isLoggedIn + ', userName: ' + userName);
         if (isLoggedIn && userName) {
-          log('已登录，直接显示主界面');
           showMainUI(userName);
         } else if (isInFeishuClient()) {
-          log('在飞书客户端内，尝试免登');
           const autoLoginSuccess = await initFeishuAuth();
           if (!autoLoginSuccess) {
-            log('免登失败，显示扫码登录');
             showLoginUI();
             initQRLogin();
           }
         } else {
-          log('非飞书客户端，直接显示扫码登录');
           showLoginUI();
           initQRLogin();
         }
@@ -382,6 +351,7 @@
       <button class="btn btn-success" onclick="sendApplyNotify()"><i class="bi bi-megaphone-fill pe-1"></i>申领通知</button>
       <button class="btn btn-primary" onclick="sendToFeishu()"><i class="bi bi-send pe-1"></i>替换通知</button>
     </div>
+    <!-- 预览区域（兼容移动端） -->
     <pre class="rounded"><code id="preview" class="language-plaintext"></code></pre>
   </div>
 
@@ -389,7 +359,7 @@
 
   <script crossorigin="anonymous" src="https://lib.baomitu.com/twitter-bootstrap/5.3.3/js/bootstrap.bundle.min.js"></script>
   <script crossorigin="anonymous" src="https://lib.baomitu.com/highlight.js/11.10.0/highlight.min.js"></script>
-
+  <script src="https://lf-package-cn.feishucdn.com/obj/feishu-static/lark/passport/qrcode/LarkSSOSDKWebQRCode-1.0.3.js"></script>
   <script>
     (async function () {
       try {
