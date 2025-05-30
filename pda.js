@@ -840,16 +840,21 @@ function sendToFeishu() {
   })
     .then(async (res) => {
       const data = await res.json();
-      if (data.success) {
+      if (data.code === 0) {
         showToast("卡片消息已发送 ✅", "success");
         // 打印 message_id
-        console.log('飞书返回的 message_id:', data.data.message_id);
+        console.log('飞书返回的 message_id:', data.data && data.data.message_id);
       } else {
-        showToast(`发送失败 ❌ (${data.error || '未知错误'})`, 'danger');
+        // 提取详细错误信息
+        let detail = data.msg || '未知错误';
+        if (data.error && data.error.field_violations) {
+          detail += '：' + data.error.field_violations.map(v => `${v.field}: ${v.description}`).join('; ');
+        }
+        showToast(`发送失败 ❌ (${detail})`, 'danger');
       }
     })
-    .catch(() => {
-      showToast("发送失败 ❌", "danger");
+    .catch((err) => {
+      showToast(`发送失败 ❌ (${err.message || err})`, "danger");
     });
 }
 
