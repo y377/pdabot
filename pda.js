@@ -136,10 +136,11 @@ async function handleLoginCallback({ code, type }) {
   const data = await res.json();
   if (data.code === 0) {
     localStorage.setItem('isLoggedIn', 'true');
-    localStorage.setItem('userId', data.data.open_id);
+    localStorage.setItem('userId', data.data.user_id);
+    localStorage.setItem('openId', data.data.open_id);
     localStorage.setItem('userName', data.data.name);
     localStorage.setItem('accessToken', data.data.access_token);
-    currentUser = { id: data.data.open_id, name: data.data.name };
+    currentUser = { id: data.data.user_id, name: data.data.name };
     showMainUI(data.data.name);
     loadChatList();
   } else {
@@ -212,10 +213,11 @@ async function handleFeishuCallback(code) {
     console.log('扫码登录响应:', data);
     if (data.code === 0) {
       localStorage.setItem('isLoggedIn', 'true');
-      localStorage.setItem('userId', data.data.open_id);
+      localStorage.setItem('userId', data.data.user_id);
+      localStorage.setItem('openId', data.data.open_id);
       localStorage.setItem('userName', data.data.name);
       localStorage.setItem('accessToken', data.data.access_token);
-      currentUser = { id: data.data.open_id, name: data.data.name };
+      currentUser = { id: data.data.user_id, name: data.data.name };
       showMainUI(data.data.name);
       loadChatList();
     } else {
@@ -231,35 +233,34 @@ async function handleFeishuCallback(code) {
 
 // 修改免密登录回调
 async function handleFeishuAuthCallback(code) {
-  if (!code) {
-    showToast('登录失败：缺少授权码', 'danger');
-    return;
-  }
+  console.log('检测到登录回调，code:', code);
+  if (!code) return;
+
   try {
-    console.log('开始免密登录，code:', code);
-    const res = await fetch('https://pdabot.jsjs.net/auth/feishu', {
+    // 只使用一次code，不再重复调用免密登录
+    const response = await fetch('https://pdabot.jsjs.net/auth/feishu', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json'
+      },
       body: JSON.stringify({ code })
     });
-    const data = await res.json();
-    console.log('免密登录响应:', data);
-    if (data.code === 0) {
-      localStorage.setItem('isLoggedIn', 'true');
-      localStorage.setItem('userId', data.data.open_id);
-      localStorage.setItem('userName', data.data.name);
-      localStorage.setItem('accessToken', data.data.access_token);
-      currentUser = { id: data.data.open_id, name: data.data.name };
-      showMainUI(data.data.name);
-      loadChatList();
+
+    const result = await response.json();
+    console.log('登录响应:', result);
+
+    if (result.code === 0 && result.data) {
+      // 保存用户信息和token
+      localStorage.setItem('userInfo', JSON.stringify(result.data));
+      localStorage.setItem('access_token', result.data.access_token);
+      return true;
     } else {
-      showToast(`登录失败: ${data.msg || '未知错误'}`, 'danger');
-      showLoginUI();
+      console.error('登录失败:', result.msg);
+      return false;
     }
   } catch (error) {
-    console.error('免密登录失败:', error);
-    showToast('免密登录失败', 'danger');
-    showLoginUI();
+    console.error('登录请求失败:', error);
+    return false;
   }
 }
 
@@ -821,7 +822,7 @@ function sendToFeishu() {
       return (oldPN.value || '').trim();
     })(),
     user_name: (currentUser && currentUser.name) ? currentUser.name : '',
-    user_var: { id: (currentUser && currentUser.user_id) ? currentUser.user_id : '' },
+    user_var: { id: (currentUser && currentUser.id) ? currentUser.id : '' },
     user_access_token: user_access_token
   };
   // 调试输出
