@@ -138,6 +138,7 @@ async function handleLoginCallback({ code, type }) {
     localStorage.setItem('isLoggedIn', 'true');
     localStorage.setItem('userId', data.data.open_id);
     localStorage.setItem('userName', data.data.name);
+    localStorage.setItem('accessToken', data.data.access_token);
     currentUser = { id: data.data.open_id, name: data.data.name };
     showMainUI(data.data.name);
     loadChatList();
@@ -213,6 +214,7 @@ async function handleFeishuCallback(code) {
       localStorage.setItem('isLoggedIn', 'true');
       localStorage.setItem('userId', data.data.open_id);
       localStorage.setItem('userName', data.data.name);
+      localStorage.setItem('accessToken', data.data.access_token);
       currentUser = { id: data.data.open_id, name: data.data.name };
       showMainUI(data.data.name);
       loadChatList();
@@ -246,6 +248,7 @@ async function handleFeishuAuthCallback(code) {
       localStorage.setItem('isLoggedIn', 'true');
       localStorage.setItem('userId', data.data.open_id);
       localStorage.setItem('userName', data.data.name);
+      localStorage.setItem('accessToken', data.data.access_token);
       currentUser = { id: data.data.open_id, name: data.data.name };
       showMainUI(data.data.name);
       loadChatList();
@@ -794,6 +797,7 @@ function sendToFeishu() {
     return;
   }
   // 取表单内容，变量名与卡片模板一致，全部转为字符串
+  const user_access_token = localStorage.getItem('accessToken') || '';
   const data = {
     shangxin_xiajiu: `更换「${type || ''}」`,
     danhao: orderNum + '',
@@ -817,7 +821,8 @@ function sendToFeishu() {
       return (oldPN.value || '').trim();
     })(),
     user_name: (currentUser && currentUser.name) ? currentUser.name : '',
-    user_var: { id: (currentUser && currentUser.user_id) ? currentUser.user_id : '' }
+    user_var: { id: (currentUser && currentUser.user_id) ? currentUser.user_id : '' },
+    user_access_token: user_access_token
   };
   // 调试输出
   console.log('发送到worker的数据:', JSON.stringify({
