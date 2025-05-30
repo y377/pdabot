@@ -248,6 +248,31 @@
         }
       }
     });
+
+    // 添加提示框函数
+    function showToast(msg, type = "primary", delay = 5000) {
+      const container = document.getElementById("toastContainer");
+      if (!container) {
+        console.error('未找到提示框容器');
+        return;
+      }
+
+      const toast = document.createElement("div");
+      toast.className = `toast text-bg-${type} border-0`;
+      toast.setAttribute("role", "alert");
+      toast.setAttribute("aria-live", "assertive");
+      toast.setAttribute("aria-atomic", "true");
+      toast.innerHTML = `<div class="toast-body">${msg}</div>`;
+      container.appendChild(toast);
+
+      const bsToast = new bootstrap.Toast(toast, {
+        animation: true,
+        autohide: true,
+        delay: delay
+      });
+      bsToast.show();
+      toast.addEventListener('hidden.bs.toast', () => toast.remove());
+    }
   </script>
 </head>
 
