@@ -15,293 +15,210 @@
   <link crossorigin="anonymous" href="/icons/icon-144x144.png" rel="apple-touch-icon" />
   <script type="text/javascript" src="https://lf-scm-cn.feishucdn.com/lark/op/h5-js-sdk-1.5.38.js"></script>
   <script>
-    // 飞书登录相关功能
+    // 飞书应用配置
     const FEISHU_CONFIG = {
       client_id: 'cli_a8b10d009ef8d00c',
-      redirect_uri: 'https://pdabot.jsjs.net/'
+      redirect_uri: 'https://pdabot.jsjs.net/',
+      api_base: 'https://open.feishu.cn',
+      endpoints: {
+        auth: '/open-apis/authen/v1',
+        im: '/open-apis/im/v1',
+        tenant: '/open-apis/auth/v3'
+      }
     };
 
-    const FEISHU_APP_ID = 'cli_a8b10d009ef8d00c'; // 替换为你的AppID
+    // 飞书登录状态管理
+    const FeishuAuth = {
+      // 检查是否在飞书客户端内
+      isInClient() {
+        return /Lark|Feishu/.test(navigator.userAgent) && typeof window.tt !== 'undefined';
+      },
 
-    // 检查是否在飞书客户端内
-    const isInFeishuClient = () => {
-      const ua = navigator.userAgent;
-      const inFeishu = /Lark|Feishu/.test(ua);
-      return inFeishu && typeof window.tt !== 'undefined';
-    };
-
-    // 获取飞书预授权码，优先 requestAccess，降级 requestAuthCode
-    const getFeishuPreAuthCode = () => {
-      return new Promise((resolve, reject) => {
-        if (window.tt && typeof window.tt.requestAccess === 'function') {
-          window.tt.requestAccess({
-            appID: FEISHU_APP_ID,
-            scopeList: [],
-            state: 'myContext',
-            success: (res) => {
-              resolve(res.code);
-            },
-            fail: (error) => {
-              if (error.errno === 103) {
-                callRequestAuthCode(resolve, reject);
-              } else {
-                reject(error);
-              }
-            }
-          });
-        } else {
-          callRequestAuthCode(resolve, reject);
+      // 获取预授权码
+      async getPreAuthCode() {
+        if (!this.isInClient()) {
+          throw new Error('非飞书客户端环境');
         }
-      });
-    };
 
-    const callRequestAuthCode = (resolve, reject) => {
-      if (window.tt && typeof window.tt.requestAuthCode === 'function') {
-        window.tt.requestAuthCode({
-          appId: FEISHU_APP_ID,
-          success: (res) => {
-            resolve(res.code);
-          },
-          fail: (error) => {
-            reject(error);
+        try {
+          if (window.tt?.requestAccess) {
+            return await new Promise((resolve, reject) => {
+              window.tt.requestAccess({
+                appID: FEISHU_CONFIG.client_id,
+                scopeList: [],
+                state: 'myContext',
+                success: (res) => resolve(res.code),
+                fail: (error) => {
+                  if (error.errno === 103) {
+                    this.requestAuthCode(resolve, reject);
+                  } else {
+                    reject(error);
+                  }
+                }
+              });
+            });
+          } else {
+            return await this.requestAuthCode();
           }
-        });
-      } else {
-        reject({ errno: 999, errString: 'JSAPI不可用' });
-      }
-    };
+        } catch (error) {
+          console.error('获取预授权码失败:', error);
+          throw error;
+        }
+      },
 
-    // 修改登录回调统一处理
-    const handleLoginCallback = async ({ code, type }) => {
-      let url = '';
-      if (type === 'scan') {
-        url = 'https://pdabot.jsjs.net/auth/scan';
-      } else if (type === 'feishu') {
-        url = 'https://pdabot.jsjs.net/auth/feishu';
-      }
-      const res = await fetch(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ code })
-      });
-      const data = await res.json();
-      if (data.code === 0) {
-        // 存储完整的 token 信息
-        localStorage.setItem('feishu_token', JSON.stringify({
-          access_token: data.data.access_token,
-          refresh_token: data.data.refresh_token,
-          expireTime: data.data.expireTime,
-          tokenInfo: data.data.tokenInfo
-        }));
+      // 降级获取授权码
+      async requestAuthCode() {
+        if (!window.tt?.requestAuthCode) {
+          throw new Error('JSAPI不可用');
+        }
+
+        return new Promise((resolve, reject) => {
+          window.tt.requestAuthCode({
+            appId: FEISHU_CONFIG.client_id,
+            success: (res) => resolve(res.code),
+            fail: (error) => reject(error)
+          });
+        });
+      },
+
+      // 处理登录回调
+      async handleLoginCallback({ code, type }) {
+        try {
+          const url = type === 'scan' 
+            ? 'https://pdabot.jsjs.net/auth/scan'
+            : 'https://pdabot.jsjs.net/auth/feishu';
+
+          const response = await fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ code })
+          });
+
+          const data = await response.json();
+          if (data.code !== 0) {
+            throw new Error(data.msg || '登录失败');
+          }
+
+          // 存储用户信息
+          this.saveUserInfo(data.data);
+          return data.data;
+        } catch (error) {
+          console.error('登录回调处理失败:', error);
+          throw error;
+        }
+      },
+
+      // 保存用户信息
+      saveUserInfo(data) {
+        const userInfo = {
+          access_token: data.access_token,
+          refresh_token: data.refresh_token,
+          expireTime: data.expireTime,
+          tokenInfo: data.tokenInfo
+        };
+
+        // 存储 token 信息
+        localStorage.setItem('feishu_token', JSON.stringify(userInfo));
+        
         // 存储用户基本信息
         localStorage.setItem('isLoggedIn', 'true');
-        localStorage.setItem('userId', data.data.user_id);
-        localStorage.setItem('userName', data.data.name);
-        localStorage.setItem('userAvatar', data.data.avatar_url);
-        currentUser = { 
-          id: data.data.user_id, 
-          name: data.data.name,
-          avatar: data.data.avatar_url
+        localStorage.setItem('userId', data.user_id);
+        localStorage.setItem('userName', data.name);
+        localStorage.setItem('userAvatar', data.avatar_url);
+
+        // 更新当前用户信息
+        window.currentUser = {
+          id: data.user_id,
+          name: data.name,
+          avatar: data.avatar_url
         };
-        showMainUI(data.data.name, data.data.avatar_url);
-        loadChatList();
-      } else {
-        showToast('登录失败', 'danger');
-        showLoginUI();
-      }
-    };
+      },
 
-    // 飞书客户端内免登录
-    const initFeishuAuth = async () => {
-      if (!/Lark|Feishu/.test(navigator.userAgent) || typeof window.tt === 'undefined') {
-        return false;
-      }
-      try {
-        const code = await getFeishuPreAuthCode();
-        // 调用后端免登录接口
-        const response = await fetch('/auth/feishu', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ code })
+      // 初始化二维码登录
+      initQRLogin() {
+        if (this.isInClient()) return;
+
+        const state = Math.random().toString(36).slice(2);
+        const goto = `${FEISHU_CONFIG.api_base}/suite/passport/oauth/authorize?` + 
+          new URLSearchParams({
+            client_id: FEISHU_CONFIG.client_id,
+            redirect_uri: FEISHU_CONFIG.redirect_uri,
+            response_type: 'code',
+            state
+          }).toString();
+
+        const QRLoginObj = QRLogin({
+          id: "login_container",
+          goto,
+          width: "300",
+          height: "300"
         });
-        const data = await response.json();
-        if (data.code === 0) {
-          localStorage.setItem('isLoggedIn', 'true');
-          localStorage.setItem('userId', data.data.user_id);
-          localStorage.setItem('userName', data.data.name);
-          localStorage.setItem('userAvatar', data.data.avatar_url);
-          currentUser = { 
-            id: data.data.user_id, 
-            name: data.data.name,
-            avatar: data.data.avatar_url
-          };
-          showMainUI(data.data.name, data.data.avatar_url);
+
+        // 处理消息回调
+        const handleMessage = (event) => {
+          if (QRLoginObj.matchOrigin(event.origin) && QRLoginObj.matchData(event.data)) {
+            window.location.href = `${goto}&tmp_code=${event.data.tmp_code}`;
+          }
+        };
+
+        window.addEventListener('message', handleMessage, false);
+      },
+
+      // 客户端内免登录
+      async initClientAuth() {
+        if (!this.isInClient()) return false;
+
+        try {
+          const code = await this.getPreAuthCode();
+          const data = await this.handleLoginCallback({ code, type: 'feishu' });
           return true;
-        } else {
-          throw new Error(data.msg || '免登录失败');
+        } catch (error) {
+          console.error('客户端免登录失败:', error);
+          return false;
         }
-      } catch (error) {
-        showToast('免登录失败: ' + (error.errString || error.message), 'danger');
-        return false;
       }
-    };
-
-    // 初始化二维码登录
-    const initQRLogin = () => {
-      if (isInFeishuClient()) {
-        return;
-      }
-
-      const state = Math.random().toString(36).slice(2);
-      const goto = `https://passport.feishu.cn/suite/passport/oauth/authorize?client_id=${FEISHU_CONFIG.client_id}&redirect_uri=${encodeURIComponent(FEISHU_CONFIG.redirect_uri)}&response_type=code&state=${state}`;
-
-      var QRLoginObj = QRLogin({
-        id: "login_container",
-        goto: goto,
-        width: "300",
-        height: "300"
-      });
-
-      const handleMessage = (event) => {
-        if (QRLoginObj.matchOrigin(event.origin) && QRLoginObj.matchData(event.data)) {
-          var loginTmpCode = event.data.tmp_code;
-          window.location.href = `${goto}&tmp_code=${loginTmpCode}`;
-        }
-      };
-      window.addEventListener('message', handleMessage, false);
-    };
-
-    // 扫码登录回调
-    const handleFeishuCallback = async (code) => {
-      await handleLoginCallback({ code, type: 'scan' });
-    };
-
-    // APP免密登录回调
-    const handleFeishuAuthCallback = async (code) => {
-      await handleLoginCallback({ code, type: 'feishu' });
-    };
-
-    // 修改加载群列表函数
-    const loadChatList = async () => {
-      try {
-        const tokenInfo = JSON.parse(localStorage.getItem('feishu_token') || '{}');
-        if (!tokenInfo.access_token) {
-          showToast('未登录，无法获取群列表', 'warning');
-          return;
-        }
-
-        const res = await fetch('https://pdabot.jsjs.net/api/chat-list', {
-          headers: {
-            'Authorization': `Bearer ${tokenInfo.access_token}`
-          }
-        });
-        const data = await res.json();
-        if (data.code === 401) {
-          // 如果 token 过期，尝试刷新
-          if (tokenInfo.refresh_token) {
-            try {
-              const refreshRes = await fetch('https://pdabot.jsjs.net/auth/refresh', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                  user_id: localStorage.getItem('userId'),
-                  refresh_token: tokenInfo.refresh_token
-                })
-              });
-              const refreshData = await refreshRes.json();
-              if (refreshData.code === 0) {
-                // 更新 token 信息
-                localStorage.setItem('feishu_token', JSON.stringify(refreshData.data));
-                // 重试加载群列表
-                return loadChatList();
-              }
-            } catch (e) {
-              console.error('刷新 token 失败:', e);
-            }
-          }
-          showToast('未授权访问群列表', 'danger');
-          return;
-        }
-        if (data.code === 0 && data.data && data.data.items) {
-          const chatSelect = document.getElementById('chatSelect');
-          if (chatSelect) {
-            chatSelect.innerHTML = '<option value="">请选择要发送的群</option>' + 
-              data.data.items.map(chat => 
-                `<option value="${chat.chat_id}">${chat.name}</option>`
-              ).join('');
-          }
-        } else {
-          showToast('群列表数据格式错误', 'warning');
-        }
-      } catch (e) {
-        console.error('加载群列表失败:', e);
-        showToast('群列表加载失败', 'danger');
-      }
-    };
-
-    // 修改显示主界面的函数
-    const showMainUI = (userName, avatarUrl) => {
-      document.getElementById('loginUI').style.display = 'none';
-      document.getElementById('mainUI').style.display = 'block';
-      
-      const userAvatar = document.getElementById('userAvatar');
-      userAvatar.src = avatarUrl || 'https://s3-imfile.feishucdn.com/static-resource/v1/v2_7b2b3c3c-3c3c-3c3c-3c3c-3c3c3c3c3c3c~?image_size=72x72&cut_type=&quality=&format=image&sticker_format=.webp';
-      userAvatar.setAttribute('title', userName);
-      
-      // 更新 tooltip
-      const tooltip = bootstrap.Tooltip.getInstance(userAvatar);
-      if (tooltip) {
-        tooltip.dispose();
-      }
-      new bootstrap.Tooltip(userAvatar);
-    };
-
-    // 修改显示登录界面的函数
-    const showLoginUI = () => {
-      document.getElementById('loginUI').style.display = 'block';
-      document.getElementById('mainUI').style.display = 'none';
-      
-      const userAvatar = document.getElementById('userAvatar');
-      userAvatar.src = 'https://s3-imfile.feishucdn.com/static-resource/v1/v2_7b2b3c3c-3c3c-3c3c-3c3c-3c3c3c3c3c3c~?image_size=72x72&cut_type=&quality=&format=image&sticker_format=.webp';
-      userAvatar.setAttribute('title', '未登录');
-      
-      // 更新 tooltip
-      const tooltip = bootstrap.Tooltip.getInstance(userAvatar);
-      if (tooltip) {
-        tooltip.dispose();
-      }
-      new bootstrap.Tooltip(userAvatar);
     };
 
     // 页面加载完成后初始化
     document.addEventListener('DOMContentLoaded', async () => {
-      // 初始化所有 tooltips
-      const tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
-      tooltipTriggerList.map(function (tooltipTriggerEl) {
-        return new bootstrap.Tooltip(tooltipTriggerEl);
-      });
+      try {
+        // 初始化 tooltips
+        const tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+        tooltipTriggerList.map(el => new bootstrap.Tooltip(el));
 
-      const urlParams = new URLSearchParams(window.location.search);
-      const code = urlParams.get('code');
-      if (code) {
-        await handleFeishuCallback(code);
-      } else {
-        const isLoggedIn = localStorage.getItem('isLoggedIn') === 'true';
-        const userName = localStorage.getItem('userName');
-        const userAvatar = localStorage.getItem('userAvatar');
-        if (isLoggedIn && userName) {
-          showMainUI(userName, userAvatar);
+        // 处理登录流程
+        const urlParams = new URLSearchParams(window.location.search);
+        const code = urlParams.get('code');
+
+        if (code) {
+          // 处理登录回调
+          const userData = await FeishuAuth.handleLoginCallback({ code, type: 'scan' });
+          showMainUI(userData.name, userData.avatar_url);
           loadChatList();
-        } else if (isInFeishuClient()) {
-          const autoLoginSuccess = await initFeishuAuth();
-          if (!autoLoginSuccess) {
-            showLoginUI();
-            initQRLogin();
-          }
         } else {
-          showLoginUI();
-          initQRLogin();
+          // 检查登录状态
+          const isLoggedIn = localStorage.getItem('isLoggedIn') === 'true';
+          const userName = localStorage.getItem('userName');
+          const userAvatar = localStorage.getItem('userAvatar');
+
+          if (isLoggedIn && userName) {
+            showMainUI(userName, userAvatar);
+            loadChatList();
+          } else if (FeishuAuth.isInClient()) {
+            const autoLoginSuccess = await FeishuAuth.initClientAuth();
+            if (!autoLoginSuccess) {
+              showLoginUI();
+              FeishuAuth.initQRLogin();
+            }
+          } else {
+            showLoginUI();
+            FeishuAuth.initQRLogin();
+          }
         }
+      } catch (error) {
+        console.error('初始化失败:', error);
+        showToast('初始化失败: ' + error.message, 'danger');
+        showLoginUI();
       }
     });
 
@@ -334,7 +251,7 @@
 
 <body class="container mb-5">
   <!-- 登录界面 -->
-  <div id="loginContainer" class="text-center py-5">
+  <div id="loginUI" class="text-center py-5">
     <div class="card mx-auto" style="max-width: 35rem;">
       <div class="card-header"><i class="bi bi-upc-scan px-2"></i>PDA扫码助手</div>
       <div class="card-body">
@@ -345,7 +262,7 @@
   </div>
 
   <!-- 主界面（默认隐藏） -->
-  <div id="mainContainer" class="d-none">
+  <div id="mainUI" class="d-none">
     <div class="container-fluid">
       <div class="row">
         <div class="col-12">
