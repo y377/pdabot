@@ -24,10 +24,8 @@ const saveUserInfo = (userData) => {
   localStorage.setItem('userId', userData.user_id);
   localStorage.setItem('userName', userData.name);
   
-  // 只保存 avatar_url
-  if (userData.avatar_url) {
-    localStorage.setItem('userAvatar', userData.avatar_url);
-  }
+  // 保存头像
+  localStorage.setItem('userAvatar', userData.avatar);
   
   // 保存 token 信息
   localStorage.setItem('feishu_token', JSON.stringify({
@@ -57,7 +55,7 @@ const clearUserInfo = () => {
 const showMainUI = () => {
   document.getElementById('loginUI').style.display = 'none';
   document.getElementById('mainUI').classList.remove('d-none');
-  const avatarUrl = localStorage.getItem('userAvatar');
+  const avatarUrl = localStorage.getItem('userAvatar') || currentUser.avatar || 'https://pdabot.jsjs.net/default-avatar.png'; // 默认头像
   const userName = localStorage.getItem('userName');
   showUserAvatar(avatarUrl, userName);
 
