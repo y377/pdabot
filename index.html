@@ -158,14 +158,10 @@
   <script src="https://lf-package-cn.feishucdn.com/obj/feishu-static/lark/passport/qrcode/LarkSSOSDKWebQRCode-1.0.3.js"></script>
   
   <script>
+    // 飞书应用配置
     const FEISHU_CONFIG = {
       client_id: 'cli_a8b10d009ef8d00c',
-      redirect_uri: 'https://pdabot.jsjs.net/',
-      api_base: 'https://open.feishu.cn',
-      endpoints: {
-        auth: '/open-apis/authen/v1',    // 用于用户认证
-        im: '/open-apis/im/v1'           // 用于发送消息
-      }
+      redirect_uri: 'https://pdabot.jsjs.net/'
     };
 
     // 飞书登录状态管理
@@ -278,7 +274,7 @@
         if (FeishuAuth.isInClient()) return;
 
         const state = Math.random().toString(36).slice(2);
-        const goto = `${FEISHU_CONFIG.api_base}/suite/passport/oauth/authorize?` + 
+        const goto = `https://passport.feishu.cn/suite/passport/oauth/authorize?` + 
           new URLSearchParams({
             client_id: FEISHU_CONFIG.client_id,
             redirect_uri: FEISHU_CONFIG.redirect_uri,
@@ -314,6 +310,64 @@
         } catch (error) {
           console.error('客户端免登录失败:', error);
           return false;
+        }
+      },
+
+      // 加载群列表
+      loadChatList: async () => {
+        try {
+          const tokenInfo = JSON.parse(localStorage.getItem('feishu_token') || '{}');
+          if (!tokenInfo.access_token) {
+            showToast('未登录，无法获取群列表', 'warning');
+            return;
+          }
+
+          const res = await fetch('https://pdabot.jsjs.net/api/chat-list', {
+            headers: {
+              'Authorization': `Bearer ${tokenInfo.access_token}`
+            }
+          });
+          const data = await res.json();
+          if (data.code === 401) {
+            // 如果 token 过期，尝试刷新
+            if (tokenInfo.refresh_token) {
+              try {
+                const refreshRes = await fetch('https://pdabot.jsjs.net/auth/refresh', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({
+                    user_id: localStorage.getItem('userId'),
+                    refresh_token: tokenInfo.refresh_token
+                  })
+                });
+                const refreshData = await refreshRes.json();
+                if (refreshData.code === 0) {
+                  // 更新 token 信息
+                  localStorage.setItem('feishu_token', JSON.stringify(refreshData.data));
+                  // 重试加载群列表
+                  return FeishuAuth.loadChatList();
+                }
+              } catch (e) {
+                console.error('刷新 token 失败:', e);
+              }
+            }
+            showToast('未授权访问群列表', 'danger');
+            return;
+          }
+          if (data.code === 0 && data.data && data.data.items) {
+            const chatSelect = document.getElementById('chatSelect');
+            if (chatSelect) {
+              chatSelect.innerHTML = '<option value="">请选择要发送的群</option>' + 
+                data.data.items.map(chat => 
+                  `<option value="${chat.chat_id}">${chat.name}</option>`
+                ).join('');
+            }
+          } else {
+            showToast('群列表数据格式错误', 'warning');
+          }
+        } catch (e) {
+          console.error('加载群列表失败:', e);
+          showToast('群列表加载失败', 'danger');
         }
       }
     };
@@ -359,7 +413,7 @@
           const userData = await FeishuAuth.handleLoginCallback({ code, type: 'scan' });
           document.getElementById('loginUI').style.display = 'none';
           document.getElementById('mainUI').classList.remove('d-none');
-          loadChatList();
+          FeishuAuth.loadChatList();
         } else {
           // 检查登录状态
           const isLoggedIn = localStorage.getItem('isLoggedIn') === 'true';
@@ -369,7 +423,7 @@
           if (isLoggedIn && userName) {
             document.getElementById('loginUI').style.display = 'none';
             document.getElementById('mainUI').classList.remove('d-none');
-            loadChatList();
+            FeishuAuth.loadChatList();
           } else if (FeishuAuth.isInClient()) {
             const autoLoginSuccess = await FeishuAuth.initClientAuth();
             if (!autoLoginSuccess) {
