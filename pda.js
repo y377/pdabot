@@ -37,7 +37,7 @@ orderNo.addEventListener("input", function () {
   orderNoDisplay.textContent = num ? `${num}` : ""; //单号识别：${num}
 });
 
-function showToast(msg, type = "primary", delay = 5000) {
+const showToast = (msg, type = "primary", delay = 5000) => {
   const container = document.getElementById("toastContainer");
   if (!container) {
     return;
@@ -58,9 +58,9 @@ function showToast(msg, type = "primary", delay = 5000) {
   });
   bsToast.show();
   toast.addEventListener('hidden.bs.toast', () => toast.remove());
-}
+};
 
-function updateBrandOptions() {
+const updateBrandOptions = () => {
   if (!window.partsData || !window.partsData.brandMap) return;
   const type = typeSelect.value;
   const brandMap = window.partsData.brandMap;
@@ -100,10 +100,10 @@ function updateBrandOptions() {
   section.classList.remove("d-none");
   updatePnOptions(type, newBrand.value, newPnOptions);
   updatePnOptions(type, oldBrand.value, oldPnOptions);
-}
+};
 
 // 添加等待数据加载函数
-function waitForData() {
+const waitForData = () => {
   return new Promise((resolve) => {
     if (window.partsData && window.partsData.brandMap) {
       resolve();
@@ -118,10 +118,10 @@ function waitForData() {
       checkData();
     }
   });
-}
+};
 
-// 登录回调统一处理
-async function handleLoginCallback({ code, type }) {
+// 修改登录回调统一处理
+const handleLoginCallback = async ({ code, type }) => {
   let url = '';
   if (type === 'scan') {
     url = 'https://pdabot.jsjs.net/auth/scan';
@@ -135,11 +135,17 @@ async function handleLoginCallback({ code, type }) {
   });
   const data = await res.json();
   if (data.code === 0) {
+    // 存储完整的 token 信息
+    localStorage.setItem('feishu_token', JSON.stringify({
+      access_token: data.data.access_token,
+      refresh_token: data.data.refresh_token,
+      expireTime: data.data.expireTime,
+      tokenInfo: data.data.tokenInfo
+    }));
+    // 存储用户基本信息
     localStorage.setItem('isLoggedIn', 'true');
     localStorage.setItem('userId', data.data.user_id);
-    localStorage.setItem('openId', data.data.open_id);
     localStorage.setItem('userName', data.data.name);
-    localStorage.setItem('accessToken', data.data.access_token);
     currentUser = { id: data.data.user_id, name: data.data.name };
     showMainUI(data.data.name);
     loadChatList();
@@ -147,19 +153,19 @@ async function handleLoginCallback({ code, type }) {
     showToast('登录失败', 'danger');
     showLoginUI();
   }
-}
+};
 
 // 修改 redirectToFeishuLogin 函数
-function redirectToFeishuLogin() {
+const redirectToFeishuLogin = () => {
   const client_id = 'cli_a8be137e6579500b';
   const redirect_uri = encodeURIComponent('https://pdabot.jsjs.net/');
   const state = Math.random().toString(36).slice(2);
   const url = `https://passport.feishu.cn/suite/passport/oauth/authorize?client_id=${client_id}&redirect_uri=${redirect_uri}&response_type=code&state=${state}`;
   window.location.href = url;
-}
+};
 
 // 修改 checkLogin 函数
-function checkLogin() {
+const checkLogin = () => {
   try {
     const urlParams = new URLSearchParams(window.location.search);
     const code = urlParams.get('code');
@@ -194,10 +200,10 @@ function checkLogin() {
     console.error('检查登录状态失败:', error);
     showLoginUI();
   }
-}
+};
 
 // 修改扫码登录回调
-async function handleFeishuCallback(code) {
+const handleFeishuCallback = async (code) => {
   if (!code) {
     showToast('登录失败：缺少授权码', 'danger');
     return;
@@ -214,7 +220,6 @@ async function handleFeishuCallback(code) {
     if (data.code === 0) {
       localStorage.setItem('isLoggedIn', 'true');
       localStorage.setItem('userId', data.data.user_id);
-      localStorage.setItem('openId', data.data.open_id);
       localStorage.setItem('userName', data.data.name);
       localStorage.setItem('accessToken', data.data.access_token);
       currentUser = { id: data.data.user_id, name: data.data.name };
@@ -229,10 +234,10 @@ async function handleFeishuCallback(code) {
     showToast('扫码登录失败', 'danger');
     showLoginUI();
   }
-}
+};
 
 // 修改免密登录回调
-async function handleFeishuAuthCallback(code) {
+const handleFeishuAuthCallback = async (code) => {
   console.log('检测到登录回调，code:', code);
   if (!code) return;
 
@@ -262,10 +267,10 @@ async function handleFeishuAuthCallback(code) {
     console.error('登录请求失败:', error);
     return false;
   }
-}
+};
 
 // 修改 showMainUI 函数
-function showMainUI(userName) {
+const showMainUI = (userName) => {
   const loginContainer = document.getElementById('loginContainer');
   const mainContainer = document.getElementById('mainContainer');
   if (!loginContainer || !mainContainer) return;
@@ -288,9 +293,9 @@ function showMainUI(userName) {
   if (window.bootstrap) {
     new bootstrap.Tooltip(userInfoBtn);
   }
-}
+};
 
-function showLoginUI() {
+const showLoginUI = () => {
   const loginContainer = document.getElementById('loginContainer');
   const mainContainer = document.getElementById('mainContainer');
   if (!loginContainer || !mainContainer) {
@@ -298,10 +303,10 @@ function showLoginUI() {
   }
   loginContainer.classList.remove('d-none');
   mainContainer.classList.add('d-none');
-}
+};
 
 // 封装初始化逻辑
-async function mainInit() {
+const mainInit = async () => {
   try {
     // 等待数据加载
     await waitForData();
@@ -352,7 +357,7 @@ async function mainInit() {
   } catch (error) {
     console.error('页面初始化失败:', error);
   }
-}
+};
 
 // 修改页面加载事件，确保 partsData 加载后再初始化
 
@@ -367,7 +372,7 @@ if (!window.partsData || !window.partsData.brandMap) {
 }
 
 // 修改 loadFormData 函数
-async function loadFormData() {
+const loadFormData = async () => {
   restoring = true;
   try {
     // 1. 恢复类型
@@ -490,10 +495,10 @@ async function loadFormData() {
     restoring = false;
     update();
   }
-}
+};
 
 // 修改事件绑定函数
-function bindEvents() {
+const bindEvents = () => {
   if (typeSelect) {
     const typeChangeHandler = async () => {
       const type = typeSelect.value;
@@ -548,16 +553,16 @@ function bindEvents() {
     };
     copyBtn.addEventListener("click", copyHandler);
   }
-}
+};
 
 // 生成硬盘PN下拉选项
-function renderDiskPnOptions(datalist, brand) {
+const renderDiskPnOptions = (datalist, brand) => {
   const list = window.partsData.diskPnList.filter((item) => item.brand === brand);
   datalist.innerHTML = `<option value="">请选择硬盘PN</option>` + list.map((item) => `<option value="${item.pn}">${item.pn}【${item.Type}】</option>`).join("");
-}
+};
 
 // 新增：切换PN输入框为select或input
-function switchPnInput(type) {
+const switchPnInput = (type) => {
   const isDisk = type === "硬盘";
   const isCpu = type === "CPU";
   // 新件PN
@@ -612,10 +617,10 @@ function switchPnInput(type) {
     if (oldPnSelect) oldPnSelect.style.display = "none";
     oldPN.style.display = "";
   }
-}
+};
 
 // 监听硬盘PN select 的变化，实时更新预览
-function bindPNSelectUpdate() {
+const bindPNSelectUpdate = () => {
   ["newPNSelect", "oldPNSelect"].forEach(id => {
     const sel = document.getElementById(id);
     if (sel) {
@@ -623,10 +628,10 @@ function bindPNSelectUpdate() {
       sel.addEventListener("change", update);
     }
   });
-}
+};
 
 // 修改updatePnOptions函数
-function updatePnOptions(type, brand, datalist) {
+const updatePnOptions = (type, brand, datalist) => {
   if (restoring) return;
   if (type === "硬盘") {
     renderDiskPnOptions(datalist, brand);
@@ -650,20 +655,20 @@ function updatePnOptions(type, brand, datalist) {
     const list = (window.partsData.pnDataMap[type] && window.partsData.pnDataMap[type][brand]) || [];
     datalist.innerHTML = list.map((pn) => `<option value="${pn}">`).join("");
   }
-}
+};
 
 // 生成CPU PN下拉选项
-function renderCpuPnOptions(datalist, brand) {
+const renderCpuPnOptions = (datalist, brand) => {
   const list = window.partsData.cpuPnList.filter((item) => item.brand === brand);
   datalist.innerHTML = `<option value="">请选择CPU型号</option>` + list.map((item) => `<option value="${item.pn}">${item.pn}</option>`).join("");
-}
+};
 
-function formatSamsungMemoryPn(pn) {
+const formatSamsungMemoryPn = (pn) => {
   const index = pn.indexOf("M");
   return index !== -1 ? pn.slice(index) : pn;
-}
+};
 
-function update() {
+const update = () => {
   if (restoring) return;
   const type = typeSelect.value;
   const order = orderNo.value.trim().match(/\d+/)?.[0] || "";
@@ -763,10 +768,10 @@ function update() {
   }
   hljs.highlightElement(preview);
   saveFormData();
-}
+};
 
 // 新增：将Markdown表格转为对象
-function markdownTableToObject(md) {
+const markdownTableToObject = (md) => {
   const lines = md.trim().split('\n').filter(line => line.includes('|'));
   const obj = {};
   for (let i = 2; i < lines.length; i++) { // 跳过表头和分隔线
@@ -774,10 +779,10 @@ function markdownTableToObject(md) {
     obj[key] = value;
   }
   return obj;
-}
+};
 
-// 修改 sendToFeishu，传递对象数据
-function sendToFeishu() {
+// 修改发送卡片函数
+const sendToFeishu = () => {
   const type = typeSelect.value;
   const orderInput = orderNo.value.trim();
   const chatId = document.getElementById('chatSelect').value;
@@ -797,8 +802,16 @@ function sendToFeishu() {
     showToast("链接中未找到单号数字", "warning");
     return;
   }
+
+  // 获取存储的 token 信息
+  const tokenInfo = JSON.parse(localStorage.getItem('feishu_token') || '{}');
+  if (!tokenInfo.access_token) {
+    showToast('登录已过期，请重新登录', 'warning');
+    showLoginUI();
+    return;
+  }
+
   // 取表单内容，变量名与卡片模板一致，全部转为字符串
-  const user_access_token = localStorage.getItem('accessToken') || '';
   const data = {
     shangxin_xiajiu: `更换「${type || ''}」`,
     danhao: orderNum + '',
@@ -823,8 +836,11 @@ function sendToFeishu() {
     })(),
     user_name: (currentUser && currentUser.name) ? currentUser.name : '',
     user_var: { id: (currentUser && currentUser.id) ? currentUser.id : '' },
-    user_access_token: user_access_token
+    access_token: tokenInfo.access_token,
+    refresh_token: tokenInfo.refresh_token,
+    expireTime: tokenInfo.expireTime
   };
+
   // 调试输出
   console.log('发送到worker的数据:', JSON.stringify({
     title: `更换通知 - ${type}`,
@@ -832,6 +848,7 @@ function sendToFeishu() {
     chatId: chatId,
     data: data
   }));
+
   fetch("https://pdabot.jsjs.net/api/send-card", {
     method: "POST",
     headers: {
@@ -848,10 +865,14 @@ function sendToFeishu() {
       const data = await res.json();
       if (data.code === 0) {
         showToast("卡片消息已发送 ✅", "success");
-        // 打印 message_id
         console.log('飞书返回的 message_id:', data.data && data.data.message_id);
+      } else if (data.code === 401 && data.msg === 'token已刷新') {
+        // 处理 token 刷新
+        localStorage.setItem('feishu_token', JSON.stringify(data.data));
+        showToast('登录已刷新，正在重试...', 'info');
+        // 重试发送
+        sendToFeishu();
       } else {
-        // 提取详细错误信息
         let detail = data.msg || '未知错误';
         if (data.error && data.error.field_violations) {
           detail += '：' + data.error.field_violations.map(v => `${v.field}: ${v.description}`).join('; ');
@@ -862,10 +883,10 @@ function sendToFeishu() {
     .catch((err) => {
       showToast(`发送失败 ❌ (${err.message || err})`, "danger");
     });
-}
+};
 
 // 修改 sendApplyNotify 函数
-function sendApplyNotify() {
+const sendApplyNotify = () => {
   const orderInput = orderNo.value.trim();
   const urlMatch = orderInput.match(/https?:\/\/[\S]+/);
   if (!urlMatch) {
@@ -916,20 +937,20 @@ function sendApplyNotify() {
   .catch(() => {
     showToast('申领通知发送失败 ❌', 'danger');
   });
-}
+};
 
 // 获取PN值（兼容input和select）
-function getPNValue(type) {
+const getPNValue = (type) => {
   const input = document.getElementById(type === "new" ? "newPN" : "oldPN");
   const select = document.getElementById(type === "new" ? "newPNSelect" : "oldPNSelect");
   if (select && select.style.display !== "none") {
     return select.value;
   }
   return input.value;
-}
+};
 
 // 保存表单数据
-function saveFormData() {
+const saveFormData = () => {
   if (restoring) return;
   
   // 保存类型
@@ -971,36 +992,37 @@ function saveFormData() {
       localStorage.removeItem(key);
     }
   });
-}
+};
 
 // 监听所有表单项的变化，自动保存
 [orderNo, switchLocation, portNo, serverSN, newSN, oldSN, newPN, oldPN, typeSelect, newBrand, oldBrand].forEach((el) => {
   if (el) {
     el.addEventListener("input", saveFormData);
     el.addEventListener("change", saveFormData);
-    el.addEventListener("paste", function () {
+    el.addEventListener("paste", () => {
       setTimeout(saveFormData, 0);
     });
   }
 });
 
 // select PN 变化也要保存（动态生成的select也要绑定）
-function bindPNSelectSave() {
+const bindPNSelectSave = () => {
   ["newPNSelect", "oldPNSelect"].forEach((id) => {
     const sel = document.getElementById(id);
     if (sel) {
       sel.onchange = saveFormData;
     }
   });
-}
-document.addEventListener("change", function (e) {
+};
+
+document.addEventListener("change", (e) => {
   if (e.target && (e.target.id === "newPNSelect" || e.target.id === "oldPNSelect")) {
     saveFormData();
   }
 });
 
 // 重置按钮
-function resetForm() {
+const resetForm = () => {
   if (confirm("确定要重置所有数据吗？")) {
     ["pda_orderNo", "pda_type", "pda_switchLocation", "pda_portNo", "pda_serverSN", "pda_newBrand", "pda_oldBrand", "pda_newPN", "pda_oldPN", "pda_newSN", "pda_oldSN"].forEach((key) =>
       localStorage.removeItem(key)
@@ -1029,10 +1051,10 @@ function resetForm() {
       });
     }
   }
-}
+};
 
 // 新增：加载群列表
-async function loadChatList() {
+const loadChatList = async () => {
   const userId = localStorage.getItem('userId');
   if (!userId) {
     showToast('未登录，无法获取群列表', 'warning');
@@ -1064,4 +1086,4 @@ async function loadChatList() {
     console.error('加载群列表失败:', e);
     showToast('群列表加载失败', 'danger');
   }
-} 
+}; 
