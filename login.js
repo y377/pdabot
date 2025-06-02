@@ -85,7 +85,7 @@ const showUserAvatar = (avatarUrl, userName) => {
 
 // 初始化二维码登录
 const initQRLogin = () => {
-  const state = Math.random().toString(36).slice(2);
+  const state = 'scan'; // 固定为 scan，用于标识扫码登录
   const goto = `https://passport.feishu.cn/suite/passport/oauth/authorize?` +
     new URLSearchParams({
       client_id: FEISHU_CONFIG.client_id,
@@ -126,6 +126,7 @@ const handleLoginCallback = async ({ code, type }) => {
     return data.data;
   } catch (error) {
     clearUserInfo();
+    console.error('登录失败:', error);
     throw error;
   }
 };
@@ -139,15 +140,18 @@ const checkLogin = () => {
     
     if (code) {
       // 有 code 参数，说明是飞书登录回调
-      console.log('检测到登录回调，code:', code);
+      console.log('检测到登录回调，code:', code, 'state:', state);
       handleLoginCallback({ code, type: state === 'scan' ? 'scan' : 'feishu' })
         .then(() => {
           showMainUI();
           loadChatList();
+          // 清除URL参数
+          window.history.replaceState({}, document.title, window.location.pathname);
         })
         .catch((error) => {
           console.error('登录失败:', error);
           showLoginUI();
+          initQRLogin();
         });
     } else {
       // 检查登录状态
@@ -156,11 +160,13 @@ const checkLogin = () => {
         loadChatList();
       } else {
         showLoginUI();
+        initQRLogin();
       }
     }
   } catch (error) {
     console.error('检查登录状态失败:', error);
     showLoginUI();
+    initQRLogin();
   }
 };
 
@@ -200,7 +206,26 @@ const loadChatList = async () => {
 
 // 页面初始化
 const loginInit = () => {
-  if (isTokenValid()) {
+  // 检查URL参数
+  const urlParams = new URLSearchParams(window.location.search);
+  const code = urlParams.get('code');
+  const state = urlParams.get('state');
+  
+  if (code) {
+    // 有 code 参数，说明是飞书登录回调
+    console.log('检测到登录回调，code:', code);
+    handleLoginCallback({ code, type: state === 'scan' ? 'scan' : 'feishu' })
+      .then(() => {
+        showMainUI();
+        loadChatList();
+        // 清除URL参数
+        window.history.replaceState({}, document.title, window.location.pathname);
+      })
+      .catch((error) => {
+        console.error('登录失败:', error);
+        showLoginUI();
+      });
+  } else if (isTokenValid()) {
     showMainUI();
     loadChatList();
   } else {
