@@ -98,7 +98,7 @@ const showUserAvatar = (avatarUrl, userName) => {
 // 初始化二维码登录
 const initQRLogin = () => {
   const state = 'scan'; // 固定为 scan，用于标识扫码登录
-  const goto = `https://passport.feishu.cn/suite/passport/oauth/authorize?` +
+  const goto = `https://accounts.feishu.cn/open-apis/authen/v1/authorize?` +
     new URLSearchParams({
       client_id: FEISHU_CONFIG.client_id,
       redirect_uri: FEISHU_CONFIG.redirect_uri,
