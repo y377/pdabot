@@ -12,7 +12,7 @@ let currentUser = null;
 // 检查token有效性
 const isTokenValid = () => {
   const tokenInfo = JSON.parse(localStorage.getItem('feishu_token') || '{}');
-  return tokenInfo.access_token && tokenInfo.expireTime && Date.now() < tokenInfo.expireTime;
+  return !!tokenInfo.access_token;
 };
 
 // 保存用户信息到 localStorage
@@ -24,15 +24,17 @@ const saveUserInfo = (userData) => {
   localStorage.setItem('userId', userData.user_id);
   localStorage.setItem('userName', userData.name);
   
-  // 保存 token 信息
-  if (userData.access_token) {
-    localStorage.setItem('feishu_token', JSON.stringify({
-      access_token: userData.access_token,
-      refresh_token: userData.refresh_token,
-      expireTime: userData.expireTime,
-      tokenInfo: userData.tokenInfo
-    }));
+  // 保存头像
+  if (userData.avatar) {
+    localStorage.setItem('userAvatar', userData.avatar);
   }
+  
+  // 保存 token 信息
+  localStorage.setItem('feishu_token', JSON.stringify({
+    access_token: userData.access_token,
+    refresh_token: userData.refresh_token,
+    tokenInfo: userData.tokenInfo
+  }));
   
   // 更新当前用户信息
   currentUser = {
