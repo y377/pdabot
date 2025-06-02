@@ -161,7 +161,10 @@
     // 飞书应用配置
     const FEISHU_CONFIG = {
       client_id: 'cli_a8b10d009ef8d00c',
-      redirect_uri: 'https://pdabot.jsjs.net/'
+      get redirect_uri() {
+        // 获取当前页面URL，去除查询参数和hash
+        return window.location.href.split('?')[0].split('#')[0];
+      }
     };
 
     // 飞书登录状态管理
@@ -277,7 +280,7 @@
         const goto = `https://passport.feishu.cn/suite/passport/oauth/authorize?` + 
           new URLSearchParams({
             client_id: FEISHU_CONFIG.client_id,
-            redirect_uri: FEISHU_CONFIG.redirect_uri,
+            redirect_uri: encodeURIComponent(FEISHU_CONFIG.redirect_uri),
             response_type: 'code',
             state
           }).toString();
@@ -304,7 +307,28 @@
         if (!FeishuAuth.isInClient()) return false;
 
         try {
-          const code = await FeishuAuth.getPreAuthCode();
+          const code = await new Promise((resolve, reject) => {
+            window.tt.requestAccess({
+              appID: FEISHU_CONFIG.client_id,
+              scopeList: [],
+              state: 'myContext',
+              redirect_uri: FEISHU_CONFIG.redirect_uri,
+              success: (res) => resolve(res.code),
+              fail: (error) => {
+                if (error.errno === 103) {
+                  window.tt.requestAuthCode({
+                    appId: FEISHU_CONFIG.client_id,
+                    redirect_uri: FEISHU_CONFIG.redirect_uri,
+                    success: (res) => resolve(res.code),
+                    fail: (error) => reject(error)
+                  });
+                } else {
+                  reject(error);
+                }
+              }
+            });
+          });
+
           const data = await FeishuAuth.handleLoginCallback({ code, type: 'feishu' });
           return true;
         } catch (error) {
@@ -413,7 +437,10 @@
           const userData = await FeishuAuth.handleLoginCallback({ code, type: 'scan' });
           document.getElementById('loginUI').style.display = 'none';
           document.getElementById('mainUI').classList.remove('d-none');
-          FeishuAuth.loadChatList();
+          
+          // 清除URL中的code参数
+          const newUrl = window.location.pathname + window.location.hash;
+          window.history.replaceState({}, document.title, newUrl);
         } else {
           // 检查登录状态
           const isLoggedIn = localStorage.getItem('isLoggedIn') === 'true';
@@ -423,7 +450,6 @@
           if (isLoggedIn && userName) {
             document.getElementById('loginUI').style.display = 'none';
             document.getElementById('mainUI').classList.remove('d-none');
-            FeishuAuth.loadChatList();
           } else if (FeishuAuth.isInClient()) {
             const autoLoginSuccess = await FeishuAuth.initClientAuth();
             if (!autoLoginSuccess) {
