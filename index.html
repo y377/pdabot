@@ -149,8 +149,6 @@
     </div>
   </div>
 
-  <div id="debug-log" style="white-space:pre;max-height:200px;overflow:auto;background:#eee;font-size:12px;"></div>
-
   <!-- 脚本放在底部 -->
   <script type="text/javascript" src="https://lf-scm-cn.feishucdn.com/lark/op/h5-js-sdk-1.5.38.js"></script>
   <script crossorigin="anonymous" src="https://lib.baomitu.com/twitter-bootstrap/5.3.3/js/bootstrap.bundle.min.js"></script>
@@ -161,10 +159,7 @@
     // 飞书应用配置
     const FEISHU_CONFIG = {
       client_id: 'cli_a8b10d009ef8d00c',
-      get redirect_uri() {
-        // 获取当前页面URL，去除查询参数和hash
-        return window.location.href.split('?')[0].split('#')[0];
-      }
+      redirect_uri: 'https://pdabot.jsjs.net/'
     };
 
     // 飞书登录状态管理
@@ -421,48 +416,60 @@
       toast.addEventListener('hidden.bs.toast', () => toast.remove());
     };
 
-    // 页面加载完成后初始化
-    document.addEventListener('DOMContentLoaded', async () => {
-      try {
-        // 初始化 tooltips
-        const tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
-        tooltipTriggerList.map(el => new bootstrap.Tooltip(el));
+    // 检查token有效性
+    const isTokenValid = () => {
+      const tokenInfo = JSON.parse(localStorage.getItem('feishu_token') || '{}');
+      // 假设有 expireTime 字段，单位为毫秒时间戳
+      return tokenInfo.access_token && tokenInfo.expireTime && Date.now() < tokenInfo.expireTime;
+    };
 
-        // 处理登录流程
-        const urlParams = new URLSearchParams(window.location.search);
-        const code = urlParams.get('code');
+    // 显示主界面和头像
+    const showMainUI = () => {
+      document.getElementById('loginUI').style.display = 'none';
+      document.getElementById('mainUI').classList.remove('d-none');
+      // 显示头像
+      const avatarUrl = localStorage.getItem('userAvatar');
+      const userName = localStorage.getItem('userName');
+      showUserAvatar(avatarUrl, userName);
+    };
 
-        if (code) {
-          // 处理登录回调
-          const userData = await FeishuAuth.handleLoginCallback({ code, type: 'scan' });
-          document.getElementById('loginUI').style.display = 'none';
-          document.getElementById('mainUI').classList.remove('d-none');
-          
-          // 清除URL中的code参数
-          const newUrl = window.location.pathname + window.location.hash;
-          window.history.replaceState({}, document.title, newUrl);
-        } else {
-          // 检查登录状态
-          const isLoggedIn = localStorage.getItem('isLoggedIn') === 'true';
-          const userName = localStorage.getItem('userName');
-          const userAvatar = localStorage.getItem('userAvatar');
+    // 显示扫码界面
+    const showLoginUI = () => {
+      document.getElementById('loginUI').style.display = 'block';
+      document.getElementById('mainUI').classList.add('d-none');
+      // 不显示头像
+      showUserAvatar();
+    };
 
-          if (isLoggedIn && userName) {
-            document.getElementById('loginUI').style.display = 'none';
-            document.getElementById('mainUI').classList.remove('d-none');
-          } else if (FeishuAuth.isInClient()) {
-            const autoLoginSuccess = await FeishuAuth.initClientAuth();
-            if (!autoLoginSuccess) {
-              FeishuAuth.initQRLogin();
-            }
-          } else {
-            FeishuAuth.initQRLogin();
-          }
-        }
-      } catch (error) {
-        console.error('初始化失败:', error);
-        showToast('初始化失败: ' + error.message, 'danger');
-        FeishuAuth.initQRLogin();
+    // 头像渲染函数
+    const showUserAvatar = (avatarUrl, userName) => {
+      const box = document.getElementById('userAvatarBox');
+      if (!box) return;
+      box.innerHTML = '';
+      if (avatarUrl) {
+        const img = document.createElement('img');
+        img.src = avatarUrl;
+        img.alt = '用户头像';
+        img.className = 'rounded-circle';
+        img.style = 'width: 32px; height: 32px; object-fit: cover; border: 2px solid #e9ecef; cursor: pointer;';
+        img.setAttribute('title', userName || '');
+        box.appendChild(img);
+      }
+      // 否则什么都不显示
+    };
+
+    // 页面初始化
+    document.addEventListener('DOMContentLoaded', () => {
+      if (isTokenValid()) {
+        showMainUI();
+      } else {
+        // 清除本地token和用户信息
+        localStorage.removeItem('feishu_token');
+        localStorage.removeItem('isLoggedIn');
+        localStorage.removeItem('userId');
+        localStorage.removeItem('userName');
+        localStorage.removeItem('userAvatar');
+        showLoginUI();
       }
     });
 
