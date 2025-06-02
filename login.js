@@ -24,9 +24,9 @@ const saveUserInfo = (userData) => {
   localStorage.setItem('userId', userData.user_id);
   localStorage.setItem('userName', userData.name);
   
-  // 保存头像
-  if (userData.avatar) {
-    localStorage.setItem('userAvatar', userData.avatar);
+  // 只保存 avatar_url
+  if (userData.avatar_url) {
+    localStorage.setItem('userAvatar', userData.avatar_url);
   }
   
   // 保存 token 信息
@@ -85,18 +85,14 @@ const showLoginUI = () => {
 
 // 头像渲染函数
 const showUserAvatar = (avatarUrl, userName) => {
-  const box = document.getElementById('userAvatarBox');
-  if (!box) return;
-  box.innerHTML = '';
-  if (avatarUrl) {
-    const img = document.createElement('img');
-    img.src = avatarUrl;
-    img.alt = '用户头像';
-    img.className = 'rounded-circle';
-    img.style = 'width: 32px; height: 32px; object-fit: cover; border: 2px solid #e9ecef; cursor: pointer;';
-    img.setAttribute('title', userName || '');
-    box.appendChild(img);
-  }
+  // 找到页面上的 h1 元素里的 img
+  const h1 = document.querySelector('h1');
+  if (!h1) return;
+  const img = h1.querySelector('img');
+  if (!img) return;
+  img.src = avatarUrl || '';
+  if (userName) img.title = userName;
+  if (userName) img.alt = userName;
 };
 
 // 初始化二维码登录
