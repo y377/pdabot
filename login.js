@@ -110,23 +110,35 @@ const initQRLogin = () => {
 // 登录回调处理
 const handleLoginCallback = async ({ code, type }) => {
   try {
+    console.log('开始处理登录回调:', { code, type });
     const url = type === 'scan'
       ? 'https://pdabot.jsjs.net/auth/scan'
       : 'https://pdabot.jsjs.net/auth/feishu';
+    console.log('请求URL:', url);
+    
     const response = await fetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ code })
     });
+    
     const data = await response.json();
+    console.log('服务器响应:', data);
+    
     if (data.code !== 0) {
       throw new Error(data.msg || '登录失败');
     }
+    
+    if (!data.data || !data.data.user_id || !data.data.name) {
+      throw new Error('服务器返回的用户数据不完整');
+    }
+    
+    console.log('登录成功，保存用户信息:', data.data);
     saveUserInfo(data.data);
     return data.data;
   } catch (error) {
-    clearUserInfo();
     console.error('登录失败:', error);
+    clearUserInfo();
     throw error;
   }
 };
@@ -138,11 +150,14 @@ const checkLogin = () => {
     const code = urlParams.get('code');
     const state = urlParams.get('state');
     
+    console.log('检查登录状态:', { code, state });
+    
     if (code) {
       // 有 code 参数，说明是飞书登录回调
       console.log('检测到登录回调，code:', code, 'state:', state);
       handleLoginCallback({ code, type: state === 'scan' ? 'scan' : 'feishu' })
         .then(() => {
+          console.log('登录成功，显示主界面');
           showMainUI();
           loadChatList();
           // 清除URL参数
@@ -151,14 +166,34 @@ const checkLogin = () => {
         .catch((error) => {
           console.error('登录失败:', error);
           showLoginUI();
+          // 显示错误提示
+          const toastContainer = document.getElementById('toastContainer');
+          if (toastContainer) {
+            const toast = document.createElement('div');
+            toast.className = 'toast text-bg-danger border-0';
+            toast.setAttribute('role', 'alert');
+            toast.setAttribute('aria-live', 'assertive');
+            toast.setAttribute('aria-atomic', 'true');
+            toast.innerHTML = `<div class="toast-body">登录失败: ${error.message}</div>`;
+            toastContainer.appendChild(toast);
+            const bsToast = new bootstrap.Toast(toast, {
+              animation: true,
+              autohide: true,
+              delay: 5000
+            });
+            bsToast.show();
+            toast.addEventListener('hidden.bs.toast', () => toast.remove());
+          }
           initQRLogin();
         });
     } else {
       // 检查登录状态
       if (isTokenValid()) {
+        console.log('Token有效，显示主界面');
         showMainUI();
         loadChatList();
       } else {
+        console.log('Token无效，显示登录界面');
         showLoginUI();
         initQRLogin();
       }
