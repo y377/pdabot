@@ -60,6 +60,20 @@ const showMainUI = () => {
   const avatarUrl = localStorage.getItem('userAvatar');
   const userName = localStorage.getItem('userName');
   showUserAvatar(avatarUrl, userName);
+
+  // 登录成功后再加载配件数据（只加载一次）
+  if (!window.partsData) {
+    fetch('https://pn.jsjs.net/pn', { cache: 'force-cache' })
+      .then(res => res.json())
+      .then(data => {
+        window.partsData = data;
+        window.partsDataReady = true;
+        window.dispatchEvent(new Event('partsDataLoaded'));
+      })
+      .catch(err => {
+        console.error('加载配件数据失败:', err);
+      });
+  }
 };
 
 // 显示扫码界面
