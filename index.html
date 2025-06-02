@@ -24,14 +24,14 @@
     const FEISHU_APP_ID = 'cli_a8b10d009ef8d00c'; // 替换为你的AppID
 
     // 检查是否在飞书客户端内
-    function isInFeishuClient() {
+    const isInFeishuClient = () => {
       const ua = navigator.userAgent;
       const inFeishu = /Lark|Feishu/.test(ua);
       return inFeishu && typeof window.tt !== 'undefined';
-    }
+    };
 
     // 获取飞书预授权码，优先 requestAccess，降级 requestAuthCode
-    async function getFeishuPreAuthCode() {
+    const getFeishuPreAuthCode = () => {
       return new Promise((resolve, reject) => {
         if (window.tt && typeof window.tt.requestAccess === 'function') {
           window.tt.requestAccess({
@@ -53,8 +53,9 @@
           callRequestAuthCode(resolve, reject);
         }
       });
-    }
-    function callRequestAuthCode(resolve, reject) {
+    };
+
+    const callRequestAuthCode = (resolve, reject) => {
       if (window.tt && typeof window.tt.requestAuthCode === 'function') {
         window.tt.requestAuthCode({
           appId: FEISHU_APP_ID,
@@ -68,10 +69,50 @@
       } else {
         reject({ errno: 999, errString: 'JSAPI不可用' });
       }
-    }
+    };
+
+    // 修改登录回调统一处理
+    const handleLoginCallback = async ({ code, type }) => {
+      let url = '';
+      if (type === 'scan') {
+        url = 'https://pdabot.jsjs.net/auth/scan';
+      } else if (type === 'feishu') {
+        url = 'https://pdabot.jsjs.net/auth/feishu';
+      }
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ code })
+      });
+      const data = await res.json();
+      if (data.code === 0) {
+        // 存储完整的 token 信息
+        localStorage.setItem('feishu_token', JSON.stringify({
+          access_token: data.data.access_token,
+          refresh_token: data.data.refresh_token,
+          expireTime: data.data.expireTime,
+          tokenInfo: data.data.tokenInfo
+        }));
+        // 存储用户基本信息
+        localStorage.setItem('isLoggedIn', 'true');
+        localStorage.setItem('userId', data.data.user_id);
+        localStorage.setItem('userName', data.data.name);
+        localStorage.setItem('userAvatar', data.data.avatar_url);
+        currentUser = { 
+          id: data.data.user_id, 
+          name: data.data.name,
+          avatar: data.data.avatar_url
+        };
+        showMainUI(data.data.name, data.data.avatar_url);
+        loadChatList();
+      } else {
+        showToast('登录失败', 'danger');
+        showLoginUI();
+      }
+    };
 
     // 飞书客户端内免登录
-    async function initFeishuAuth() {
+    const initFeishuAuth = async () => {
       if (!/Lark|Feishu/.test(navigator.userAgent) || typeof window.tt === 'undefined') {
         return false;
       }
@@ -86,9 +127,15 @@
         const data = await response.json();
         if (data.code === 0) {
           localStorage.setItem('isLoggedIn', 'true');
-          localStorage.setItem('userId', data.data.open_id);
+          localStorage.setItem('userId', data.data.user_id);
           localStorage.setItem('userName', data.data.name);
-          showMainUI(data.data.name);
+          localStorage.setItem('userAvatar', data.data.avatar_url);
+          currentUser = { 
+            id: data.data.user_id, 
+            name: data.data.name,
+            avatar: data.data.avatar_url
+          };
+          showMainUI(data.data.name, data.data.avatar_url);
           return true;
         } else {
           throw new Error(data.msg || '免登录失败');
@@ -97,10 +144,10 @@
         showToast('免登录失败: ' + (error.errString || error.message), 'danger');
         return false;
       }
-    }
+    };
 
     // 初始化二维码登录
-    function initQRLogin() {
+    const initQRLogin = () => {
       if (isInFeishuClient()) {
         return;
       }
@@ -115,117 +162,125 @@
         height: "300"
       });
 
-      var handleMessage = function (event) {
+      const handleMessage = (event) => {
         if (QRLoginObj.matchOrigin(event.origin) && QRLoginObj.matchData(event.data)) {
           var loginTmpCode = event.data.tmp_code;
           window.location.href = `${goto}&tmp_code=${loginTmpCode}`;
         }
       };
       window.addEventListener('message', handleMessage, false);
-    }
-
-    // 登录回调统一处理
-    async function handleLoginCallback({ code, type }) {
-      let url = '';
-      if (type === 'scan') {
-        url = 'https://login-pda.jsjs.net/auth';
-      } else if (type === 'feishu') {
-        url = 'https://pdabot.jsjs.net/auth/feishu';
-      }
-      const res = await fetch(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ code })
-      });
-      const data = await res.json();
-      if (data.code === 0) {
-        localStorage.setItem('isLoggedIn', 'true');
-        localStorage.setItem('userId', data.data.open_id);
-        localStorage.setItem('userName', data.data.name);
-        showMainUI(data.data.name);
-        loadChatList();
-      } else {
-        showToast('登录失败', 'danger');
-        showLoginUI();
-      }
-    }
+    };
 
     // 扫码登录回调
-    async function handleFeishuCallback(code) {
+    const handleFeishuCallback = async (code) => {
       await handleLoginCallback({ code, type: 'scan' });
-    }
+    };
 
     // APP免密登录回调
-    async function handleFeishuAuthCallback(code) {
+    const handleFeishuAuthCallback = async (code) => {
       await handleLoginCallback({ code, type: 'feishu' });
-    }
+    };
 
-    // 加载群列表
-    async function loadChatList() {
+    // 修改加载群列表函数
+    const loadChatList = async () => {
       try {
-        const userId = localStorage.getItem('userId');
-        if (!userId) {
+        const tokenInfo = JSON.parse(localStorage.getItem('feishu_token') || '{}');
+        if (!tokenInfo.access_token) {
+          showToast('未登录，无法获取群列表', 'warning');
           return;
         }
 
         const res = await fetch('https://pdabot.jsjs.net/api/chat-list', {
           headers: {
-            'Authorization': 'Bearer test'
+            'Authorization': `Bearer ${tokenInfo.access_token}`
           }
         });
         const data = await res.json();
         if (data.code === 401) {
+          // 如果 token 过期，尝试刷新
+          if (tokenInfo.refresh_token) {
+            try {
+              const refreshRes = await fetch('https://pdabot.jsjs.net/auth/refresh', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  user_id: localStorage.getItem('userId'),
+                  refresh_token: tokenInfo.refresh_token
+                })
+              });
+              const refreshData = await refreshRes.json();
+              if (refreshData.code === 0) {
+                // 更新 token 信息
+                localStorage.setItem('feishu_token', JSON.stringify(refreshData.data));
+                // 重试加载群列表
+                return loadChatList();
+              }
+            } catch (e) {
+              console.error('刷新 token 失败:', e);
+            }
+          }
+          showToast('未授权访问群列表', 'danger');
           return;
         }
-        const chatList = (data.data && data.data.items) ? data.data.items : [];
-        const chatSelect = document.getElementById('chatSelect');
-        chatSelect.replaceChildren();
-        const defaultOption = document.createElement('option');
-        defaultOption.value = '';
-        defaultOption.textContent = '请选择群';
-        chatSelect.appendChild(defaultOption);
-        chatList.forEach(c => {
-          const option = document.createElement('option');
-          option.value = c.chat_id;
-          option.textContent = c.name;
-          chatSelect.appendChild(option);
-        });
+        if (data.code === 0 && data.data && data.data.items) {
+          const chatSelect = document.getElementById('chatSelect');
+          if (chatSelect) {
+            chatSelect.innerHTML = '<option value="">请选择要发送的群</option>' + 
+              data.data.items.map(chat => 
+                `<option value="${chat.chat_id}">${chat.name}</option>`
+              ).join('');
+          }
+        } else {
+          showToast('群列表数据格式错误', 'warning');
+        }
       } catch (e) {
+        console.error('加载群列表失败:', e);
         showToast('群列表加载失败', 'danger');
       }
-    }
+    };
 
-    // 显示主界面
-    function showMainUI(userName) {
-      document.getElementById('loginContainer').classList.add('d-none');
-      document.getElementById('mainContainer').classList.remove('d-none');
-      // 先移除旧的用户信息元素，避免重复
-      const h5 = document.querySelector('h5');
-      const oldUserInfo = h5.querySelector('.user-info-tooltip');
-      if (oldUserInfo) oldUserInfo.remove();
-      // 新增：用户名用带Tooltips的图标按钮显示
-      const userInfoBtn = document.createElement('button');
-      userInfoBtn.type = 'button';
-      userInfoBtn.className = 'btn btn-sm btn-outline-secondary ms-2 user-info-tooltip';
-      userInfoBtn.setAttribute('data-bs-toggle', 'tooltip');
-      userInfoBtn.setAttribute('data-bs-placement', 'bottom');
-      userInfoBtn.setAttribute('title', userName);
-      userInfoBtn.innerHTML = '<i class="bi bi-person-circle"></i>';
-      h5.appendChild(userInfoBtn);
-      // 初始化Tooltips
-      if (window.bootstrap && window.bootstrap.Tooltip) {
-        new bootstrap.Tooltip(userInfoBtn);
+    // 修改显示主界面的函数
+    const showMainUI = (userName, avatarUrl) => {
+      document.getElementById('loginUI').style.display = 'none';
+      document.getElementById('mainUI').style.display = 'block';
+      
+      const userAvatar = document.getElementById('userAvatar');
+      userAvatar.src = avatarUrl || 'https://s3-imfile.feishucdn.com/static-resource/v1/v2_7b2b3c3c-3c3c-3c3c-3c3c-3c3c3c3c3c3c~?image_size=72x72&cut_type=&quality=&format=image&sticker_format=.webp';
+      userAvatar.setAttribute('title', userName);
+      
+      // 更新 tooltip
+      const tooltip = bootstrap.Tooltip.getInstance(userAvatar);
+      if (tooltip) {
+        tooltip.dispose();
       }
-    }
+      new bootstrap.Tooltip(userAvatar);
+    };
 
-    // 显示登录界面
-    function showLoginUI() {
-      document.getElementById('loginContainer').classList.remove('d-none');
-      document.getElementById('mainContainer').classList.add('d-none');
-    }
+    // 修改显示登录界面的函数
+    const showLoginUI = () => {
+      document.getElementById('loginUI').style.display = 'block';
+      document.getElementById('mainUI').style.display = 'none';
+      
+      const userAvatar = document.getElementById('userAvatar');
+      userAvatar.src = 'https://s3-imfile.feishucdn.com/static-resource/v1/v2_7b2b3c3c-3c3c-3c3c-3c3c-3c3c3c3c3c3c~?image_size=72x72&cut_type=&quality=&format=image&sticker_format=.webp';
+      userAvatar.setAttribute('title', '未登录');
+      
+      // 更新 tooltip
+      const tooltip = bootstrap.Tooltip.getInstance(userAvatar);
+      if (tooltip) {
+        tooltip.dispose();
+      }
+      new bootstrap.Tooltip(userAvatar);
+    };
 
     // 页面加载完成后初始化
-    document.addEventListener('DOMContentLoaded', async function () {
+    document.addEventListener('DOMContentLoaded', async () => {
+      // 初始化所有 tooltips
+      const tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+      tooltipTriggerList.map(function (tooltipTriggerEl) {
+        return new bootstrap.Tooltip(tooltipTriggerEl);
+      });
+
       const urlParams = new URLSearchParams(window.location.search);
       const code = urlParams.get('code');
       if (code) {
@@ -233,8 +288,9 @@
       } else {
         const isLoggedIn = localStorage.getItem('isLoggedIn') === 'true';
         const userName = localStorage.getItem('userName');
+        const userAvatar = localStorage.getItem('userAvatar');
         if (isLoggedIn && userName) {
-          showMainUI(userName);
+          showMainUI(userName, userAvatar);
           loadChatList();
         } else if (isInFeishuClient()) {
           const autoLoginSuccess = await initFeishuAuth();
@@ -250,7 +306,7 @@
     });
 
     // 添加提示框函数
-    function showToast(msg, type = "primary", delay = 5000) {
+    const showToast = (msg, type = "primary", delay = 5000) => {
       const container = document.getElementById("toastContainer");
       if (!container) {
         console.error('未找到提示框容器');
@@ -272,7 +328,7 @@
       });
       bsToast.show();
       toast.addEventListener('hidden.bs.toast', () => toast.remove());
-    }
+    };
   </script>
 </head>
 
@@ -290,107 +346,124 @@
 
   <!-- 主界面（默认隐藏） -->
   <div id="mainContainer" class="d-none">
-    <h5 class="text-center pt-3"><i class="bi bi-upc-scan px-2"></i>PDA扫码助手</h5>
-    <div id="toastContainer" class="position-fixed top-50 start-50 translate-middle" style="z-index: 9999;"></div>
-
-    <div class="row mb-3">
-      <div class="col">
-        <label class="form-label fw-bold" for="orderNo">单号：<span id="orderNoDisplay" class="text-primary font-monospace"></span></label>
-        <input id="orderNo" type="text" class="form-control" placeholder="请粘贴单号">
+    <div class="container-fluid">
+      <div class="row">
+        <div class="col-12">
+          <div class="d-flex justify-content-between align-items-center p-3 border-bottom">
+            <h5 class="mb-0"><i class="bi bi-upc-scan px-2"></i>PDA扫码助手</h5>
+            <div class="d-flex align-items-center">
+              <img id="userAvatar" src="https://s3-imfile.feishucdn.com/static-resource/v1/v2_7b2b3c3c-3c3c-3c3c-3c3c-3c3c3c3c3c3c~?image_size=72x72&cut_type=&quality=&format=image&sticker_format=.webp" 
+                   alt="用户头像" 
+                   class="rounded-circle" 
+                   style="width: 32px; height: 32px; object-fit: cover; border: 2px solid #e9ecef; cursor: pointer;"
+                   data-bs-toggle="tooltip"
+                   data-bs-placement="bottom"
+                   title="未登录">
+            </div>
+          </div>
+        </div>
       </div>
-      <div class="col text-end">
-        <label class="form-label fw-bold" for="type">配件类型：</label>
-        <select id="type" class="form-select">
-          <option selected>请选择</option>
-          <option value="CPU">CPU</option>
-          <option value="内存">内存</option>
-          <option value="硬盘">硬盘</option>
-          <option value="光模块">光模块</option>
-          <option value="AOC线缆">AOC线缆</option>
-          <option value="主板">主板</option>
-          <option value="电源">电源</option>
-          <option value="网卡">网卡</option>
-          <option value="交换机">交换机</option>
+      <div id="toastContainer" class="position-fixed top-50 start-50 translate-middle" style="z-index: 9999;"></div>
+
+      <div class="row mb-3">
+        <div class="col">
+          <label class="form-label fw-bold" for="orderNo">单号：<span id="orderNoDisplay" class="text-primary font-monospace"></span></label>
+          <input id="orderNo" type="text" class="form-control" placeholder="请粘贴单号">
+        </div>
+        <div class="col text-end">
+          <label class="form-label fw-bold" for="type">配件类型：</label>
+          <select id="type" class="form-select">
+            <option selected>请选择</option>
+            <option value="CPU">CPU</option>
+            <option value="内存">内存</option>
+            <option value="硬盘">硬盘</option>
+            <option value="光模块">光模块</option>
+            <option value="AOC线缆">AOC线缆</option>
+            <option value="主板">主板</option>
+            <option value="电源">电源</option>
+            <option value="网卡">网卡</option>
+            <option value="交换机">交换机</option>
+          </select>
+        </div>
+      </div>
+
+      <div id="switchInfoRow" class="row my-3 d-none">
+        <div class="col-8 pe-1">
+          <label class="form-label" for="switchLocation">交换机位置：</label>
+          <input id="switchLocation" type="text" class="form-control" placeholder="">
+        </div>
+        <div class="col-4 ps-1 text-end">
+          <label class="form-label" for="portNo">端口：</label>
+          <input id="portNo" type="text" class="form-control" placeholder="">
+        </div>
+      </div>
+
+      <div id="serverSNRow" class="my-3">
+        <label class="form-label font-monospace" for="serverSN"><i class="bi bi-server px-1"></i>服务器SN：</label>
+        <input id="serverSN" type="text" class="form-control" placeholder="请扫码">
+      </div>
+
+      <div id="brandSection" class="row my-3 d-none">
+        <div class="col">
+          <label class="form-label text-danger fw-bold" for="newBrand">新件品牌：</label>
+          <select id="newBrand" class="form-select">
+            <option value="请选择">请选择</option>
+          </select>
+        </div>
+        <div class="col text-end">
+          <label class="form-label text-dark fw-bold" for="oldBrand">旧件品牌：</label>
+          <select id="oldBrand" class="form-select">
+            <option value="请选择">请选择</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="form-group my-3">
+        <label class="form-label d-flex justify-content-between" for="newSN">
+          <span class="text-danger fw-bold">新件SN：</span><small id="countNewSN" class="text-muted">字符数：0</small>
+        </label>
+        <input id="newSN" type="text" class="form-control" placeholder="">
+      </div>
+
+      <div class="form-group my-3">
+        <label class="form-label d-flex justify-content-between" for="newPN">
+          <span class="text-danger fw-bold">新件PN：</span><span id="checkNewPN" class="text-success"></span><small id="countNewPN" class="text-muted">字符数：0</small>
+        </label>
+        <input id="newPN" list="newPnOptions" type="text" class="form-control" placeholder="" autocorrect="off">
+        <datalist id="newPnOptions"></datalist>
+      </div>
+
+      <div class="form-group my-3">
+        <label class="form-label d-flex justify-content-between" for="oldSN">
+          <span class="text-dark fw-bold">旧件SN：</span><small id="countOldSN" class="text-muted">字符数：0</small>
+        </label>
+        <input id="oldSN" type="text" class="form-control" placeholder="">
+      </div>
+
+      <div class="form-group my-3">
+        <label class="form-label d-flex justify-content-between" for="oldPN">
+          <span class="text-dark fw-bold">旧件PN：</span><span id="checkOldPN" class="text-success"></span><small id="countOldPN" class="text-muted">字符数：0</small>
+        </label>
+        <input id="oldPN" list="oldPnOptions" type="text" class="form-control" placeholder="" autocorrect="off">
+        <datalist id="oldPnOptions"></datalist>
+      </div>
+
+      <div class="form-group my-3">
+        <label class="form-label fw-bold" for="chatSelect">发送到群：</label>
+        <select id="chatSelect" class="form-select">
+          <option value="">请选择群</option>
         </select>
       </div>
-    </div>
 
-    <div id="switchInfoRow" class="row my-3 d-none">
-      <div class="col-8 pe-1">
-        <label class="form-label" for="switchLocation">交换机位置：</label>
-        <input id="switchLocation" type="text" class="form-control" placeholder="">
+      <div class="d-flex justify-content-between align-items-center my-4 pt-3">
+        <button id="resetBtn" class="btn btn-warning" onclick="resetForm()"><i class="bi bi-arrow-counterclockwise pe-1"></i>清空</button>
+        <button id="copyBtn" class="btn btn-danger"><i class="bi bi-copy pe-1"></i>复制</button>
+        <button class="btn btn-success" onclick="sendApplyNotify()"><i class="bi bi-megaphone-fill pe-1"></i>申领通知</button>
+        <button class="btn btn-primary" onclick="sendToFeishu()"><i class="bi bi-send pe-1"></i>替换通知</button>
       </div>
-      <div class="col-4 ps-1 text-end">
-        <label class="form-label" for="portNo">端口：</label>
-        <input id="portNo" type="text" class="form-control" placeholder="">
-      </div>
+      <!-- 预览区域（兼容移动端） -->
+      <pre class="rounded"><code id="preview" class="language-plaintext"></code></pre>
     </div>
-
-    <div id="serverSNRow" class="my-3">
-      <label class="form-label font-monospace" for="serverSN"><i class="bi bi-server px-1"></i>服务器SN：</label>
-      <input id="serverSN" type="text" class="form-control" placeholder="请扫码">
-    </div>
-
-    <div id="brandSection" class="row my-3 d-none">
-      <div class="col">
-        <label class="form-label text-danger fw-bold" for="newBrand">新件品牌：</label>
-        <select id="newBrand" class="form-select">
-          <option value="请选择">请选择</option>
-        </select>
-      </div>
-      <div class="col text-end">
-        <label class="form-label text-dark fw-bold" for="oldBrand">旧件品牌：</label>
-        <select id="oldBrand" class="form-select">
-          <option value="请选择">请选择</option>
-        </select>
-      </div>
-    </div>
-
-    <div class="form-group my-3">
-      <label class="form-label d-flex justify-content-between" for="newSN">
-        <span class="text-danger fw-bold">新件SN：</span><small id="countNewSN" class="text-muted">字符数：0</small>
-      </label>
-      <input id="newSN" type="text" class="form-control" placeholder="">
-    </div>
-
-    <div class="form-group my-3">
-      <label class="form-label d-flex justify-content-between" for="newPN">
-        <span class="text-danger fw-bold">新件PN：</span><span id="checkNewPN" class="text-success"></span><small id="countNewPN" class="text-muted">字符数：0</small>
-      </label>
-      <input id="newPN" list="newPnOptions" type="text" class="form-control" placeholder="" autocorrect="off">
-      <datalist id="newPnOptions"></datalist>
-    </div>
-
-    <div class="form-group my-3">
-      <label class="form-label d-flex justify-content-between" for="oldSN">
-        <span class="text-dark fw-bold">旧件SN：</span><small id="countOldSN" class="text-muted">字符数：0</small>
-      </label>
-      <input id="oldSN" type="text" class="form-control" placeholder="">
-    </div>
-
-    <div class="form-group my-3">
-      <label class="form-label d-flex justify-content-between" for="oldPN">
-        <span class="text-dark fw-bold">旧件PN：</span><span id="checkOldPN" class="text-success"></span><small id="countOldPN" class="text-muted">字符数：0</small>
-      </label>
-      <input id="oldPN" list="oldPnOptions" type="text" class="form-control" placeholder="" autocorrect="off">
-      <datalist id="oldPnOptions"></datalist>
-    </div>
-
-    <div class="form-group my-3">
-      <label class="form-label fw-bold" for="chatSelect">发送到群：</label>
-      <select id="chatSelect" class="form-select">
-        <option value="">请选择群</option>
-      </select>
-    </div>
-
-    <div class="d-flex justify-content-between align-items-center my-4 pt-3">
-      <button id="resetBtn" class="btn btn-warning" onclick="resetForm()"><i class="bi bi-arrow-counterclockwise pe-1"></i>清空</button>
-      <button id="copyBtn" class="btn btn-danger"><i class="bi bi-copy pe-1"></i>复制</button>
-      <button class="btn btn-success" onclick="sendApplyNotify()"><i class="bi bi-megaphone-fill pe-1"></i>申领通知</button>
-      <button class="btn btn-primary" onclick="sendToFeishu()"><i class="bi bi-send pe-1"></i>替换通知</button>
-    </div>
-    <!-- 预览区域（兼容移动端） -->
-    <pre class="rounded"><code id="preview" class="language-plaintext"></code></pre>
   </div>
 
   <div id="debug-log" style="white-space:pre;max-height:200px;overflow:auto;background:#eee;font-size:12px;"></div>
@@ -399,7 +472,7 @@
   <script crossorigin="anonymous" src="https://lib.baomitu.com/highlight.js/11.10.0/highlight.min.js"></script>
   <script src="https://lf-package-cn.feishucdn.com/obj/feishu-static/lark/passport/qrcode/LarkSSOSDKWebQRCode-1.0.3.js"></script>
   <script>
-    (async function () {
+    (async () => {
       try {
         const res = await fetch('https://pn.jsjs.net/pn', { cache: 'force-cache' });
         window.partsData = await res.json();
