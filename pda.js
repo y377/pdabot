@@ -614,7 +614,6 @@ const sendToFeishu = () => {
   const tokenInfo = JSON.parse(localStorage.getItem('feishu_token') || '{}');
   if (!tokenInfo.access_token) {
     showToast('登录已过期，请重新登录', 'warning');
-    window.loginUtils.checkLogin();
     return;
   }
 
@@ -855,46 +854,5 @@ const resetForm = () => {
         cache.delete('https://pn.jsjs.net/pn');
       });
     }
-  }
-};
-
-// 修改 handleLoginCallback 函数
-const handleLoginCallback = async ({ code, type }) => {
-  try {
-    const result = await window.loginUtils.handleLoginCallback({ code, type });
-    if (result) {
-      window.loginUtils.showMainUI();
-      window.loginUtils.loadChatList();
-    }
-  } catch (error) {
-    showToast(error.message || '登录失败', 'danger');
-    window.loginUtils.showLoginUI();
-  }
-};
-
-// 修改 checkLogin 函数
-const checkLogin = () => {
-  try {
-    const urlParams = new URLSearchParams(window.location.search);
-    const code = urlParams.get('code');
-    const state = urlParams.get('state');
-    
-    if (code) {
-      // 有 code 参数，说明是飞书登录回调
-      console.log('检测到登录回调，code:', code);
-      handleLoginCallback({ code, type: state === 'scan' ? 'scan' : 'feishu' });
-    } else {
-      // 检查登录状态
-      if (window.loginUtils.isTokenValid()) {
-        const userName = localStorage.getItem('userName');
-        window.loginUtils.showMainUI();
-        window.loginUtils.loadChatList();
-      } else {
-        window.loginUtils.showLoginUI();
-      }
-    }
-  } catch (error) {
-    console.error('检查登录状态失败:', error);
-    window.loginUtils.showLoginUI();
   }
 }; 
