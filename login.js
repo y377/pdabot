@@ -243,30 +243,25 @@ const loadChatList = async () => {
 
 // 页面初始化
 const loginInit = () => {
-  // 检查URL参数
   const urlParams = new URLSearchParams(window.location.search);
   const code = urlParams.get('code');
   const state = urlParams.get('state');
-  
+
   if (code) {
-    // 有 code 参数，说明是飞书登录回调
-    console.log('检测到登录回调，code:', code);
     handleLoginCallback({ code, type: state === 'scan' ? 'scan' : 'feishu' })
       .then(() => {
         showMainUI();
         loadChatList();
-        // 清除URL参数
         window.history.replaceState({}, document.title, window.location.pathname);
       })
-      .catch((error) => {
-        console.error('登录失败:', error);
+      .catch(() => {
         showLoginUI();
+        initQRLogin();
       });
   } else if (isTokenValid()) {
     showMainUI();
     loadChatList();
   } else {
-    clearUserInfo();
     showLoginUI();
     initQRLogin();
   }
