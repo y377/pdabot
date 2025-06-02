@@ -6,19 +6,39 @@ const FEISHU_CONFIG = {
   redirect_uri: 'https://pdabot.jsjs.net/'
 };
 
+// 当前用户信息
+let currentUser = null;
+
 // 检查token有效性
 const isTokenValid = () => {
   const tokenInfo = JSON.parse(localStorage.getItem('feishu_token') || '{}');
   return tokenInfo.access_token && tokenInfo.expireTime && Date.now() < tokenInfo.expireTime;
 };
 
-// 保存用户信息
-tokenInfo => {
-  localStorage.setItem('feishu_token', JSON.stringify(tokenInfo));
+// 保存用户信息到 localStorage
+const saveUserInfo = (userData) => {
+  if (!userData) return;
+  
+  // 保存用户基本信息
   localStorage.setItem('isLoggedIn', 'true');
-  localStorage.setItem('userId', tokenInfo.user_id);
-  localStorage.setItem('userName', tokenInfo.name);
-  localStorage.setItem('userAvatar', tokenInfo.avatar_url);
+  localStorage.setItem('userId', userData.user_id);
+  localStorage.setItem('userName', userData.name);
+  
+  // 保存 token 信息
+  if (userData.access_token) {
+    localStorage.setItem('feishu_token', JSON.stringify({
+      access_token: userData.access_token,
+      refresh_token: userData.refresh_token,
+      expireTime: userData.expireTime,
+      tokenInfo: userData.tokenInfo
+    }));
+  }
+  
+  // 更新当前用户信息
+  currentUser = {
+    id: userData.user_id,
+    name: userData.name
+  };
 };
 
 // 清除用户信息
@@ -28,6 +48,7 @@ const clearUserInfo = () => {
   localStorage.removeItem('userId');
   localStorage.removeItem('userName');
   localStorage.removeItem('userAvatar');
+  currentUser = null;
 };
 
 // 显示主界面和头像
@@ -109,10 +130,79 @@ const handleLoginCallback = async ({ code, type }) => {
   }
 };
 
+// 检查登录状态
+const checkLogin = () => {
+  try {
+    const urlParams = new URLSearchParams(window.location.search);
+    const code = urlParams.get('code');
+    const state = urlParams.get('state');
+    
+    if (code) {
+      // 有 code 参数，说明是飞书登录回调
+      console.log('检测到登录回调，code:', code);
+      handleLoginCallback({ code, type: state === 'scan' ? 'scan' : 'feishu' })
+        .then(() => {
+          showMainUI();
+          loadChatList();
+        })
+        .catch((error) => {
+          console.error('登录失败:', error);
+          showLoginUI();
+        });
+    } else {
+      // 检查登录状态
+      if (isTokenValid()) {
+        showMainUI();
+        loadChatList();
+      } else {
+        showLoginUI();
+      }
+    }
+  } catch (error) {
+    console.error('检查登录状态失败:', error);
+    showLoginUI();
+  }
+};
+
+// 加载群列表
+const loadChatList = async () => {
+  const userId = localStorage.getItem('userId');
+  if (!userId) {
+    console.warn('未登录，无法获取群列表');
+    return;
+  }
+  try {
+    const res = await fetch('https://pdabot.jsjs.net/api/chat-list', {
+      headers: {
+        'Authorization': 'Bearer ' + userId
+      }
+    });
+    const data = await res.json();
+    if (data.code === 401) {
+      console.error('未授权访问群列表');
+      return;
+    }
+    if (data.code === 0 && data.data && data.data.items) {
+      const chatSelect = document.getElementById('chatSelect');
+      if (chatSelect) {
+        chatSelect.innerHTML = '<option value="">请选择要发送的群</option>' + 
+          data.data.items.map(chat => 
+            `<option value="${chat.chat_id}">${chat.name}</option>`
+          ).join('');
+      }
+    } else {
+      console.warn('群列表数据格式错误');
+    }
+  } catch (e) {
+    console.error('加载群列表失败:', e);
+  }
+};
+
 // 页面初始化
 const loginInit = () => {
   if (isTokenValid()) {
     showMainUI();
+    loadChatList();
   } else {
     clearUserInfo();
     showLoginUI();
@@ -129,5 +219,8 @@ window.loginUtils = {
   showLoginUI,
   clearUserInfo,
   saveUserInfo,
-  handleLoginCallback
+  handleLoginCallback,
+  checkLogin,
+  loadChatList,
+  currentUser
 }; 
