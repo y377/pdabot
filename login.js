@@ -85,14 +85,16 @@ const showLoginUI = () => {
 
 // 头像渲染函数
 const showUserAvatar = (avatarUrl, userName) => {
-  // 找到页面上的 h1 元素里的 img
-  const h1 = document.querySelector('h1');
-  if (!h1) return;
-  const img = h1.querySelector('img');
-  if (!img) return;
-  img.src = avatarUrl || '';
-  if (userName) img.title = userName;
-  if (userName) img.alt = userName;
+  setTimeout(() => {
+    const h1 = document.querySelector('h1');
+    if (!h1) return;
+    const img = h1.querySelector('img');
+    if (!img) return;
+    img.src = avatarUrl || '';
+    if (userName) img.title = userName;
+    if (userName) img.alt = userName;
+    console.log('showUserAvatar set', img.src, img.title);
+  }, 100);
 };
 
 // 初始化二维码登录
