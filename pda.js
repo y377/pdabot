@@ -170,15 +170,12 @@ const mainInit = async () => {
   }
 };
 
-// 修改页面加载事件，确保 partsData 加载后再初始化
-
-// 只要 partsData 没有加载好，就监听 partsDataLoaded 事件
+// 保证 partsData 加载后再初始化
 if (!window.partsData || !window.partsData.brandMap) {
   window.addEventListener('partsDataLoaded', () => {
     mainInit();
   }, { once: true });
 } else {
-  // 已经加载好，直接初始化
   document.addEventListener('DOMContentLoaded', mainInit);
 }
 
