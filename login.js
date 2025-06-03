@@ -123,7 +123,9 @@ const initQRLogin = () => {
 const handleLoginCallback = async ({ code, type }) => {
   try {
     console.log('开始处理登录回调:', { code, type });
-    const url = 'https://pdabot.jsjs.net/auth';
+    const url = type === 'scan'
+      ? 'https://pdabot.jsjs.net/auth/scan'
+      : 'https://pdabot.jsjs.net/auth/feishu';
     console.log('请求URL:', url);
     
     const response = await fetch(url, {
