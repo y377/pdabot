@@ -1,125 +1,38 @@
 // login.js
 
-// 飞书应用配置
+// 1. 配置和全局变量
 const FEISHU_CONFIG = {
   client_id: 'cli_a8b10d009ef8d00c',
   redirect_uri: 'https://pdabot.jsjs.net/'
 };
-
-// 当前用户信息
 let currentUser = null;
 
-// 检查token有效性
-const isTokenValid = () => {
-  const tokenInfo = JSON.parse(localStorage.getItem('feishu_token') || '{}');
-  return !!tokenInfo.access_token;
-};
+// 2. 主流程函数
+const loginInit = () => {
+  const urlParams = new URLSearchParams(window.location.search);
+  const code = urlParams.get('code');
+  const state = urlParams.get('state');
 
-// 保存用户信息到 localStorage
-const saveUserInfo = (userData) => {
-  if (!userData) return;
-  
-  // 保存用户基本信息
-  localStorage.setItem('isLoggedIn', 'true');
-  localStorage.setItem('userId', userData.user_id);
-  localStorage.setItem('userName', userData.name);
-  
-  // 保存头像
-  localStorage.setItem('userAvatar', userData.avatar_url);
-  
-  // 保存 token 信息
-  localStorage.setItem('feishu_token', JSON.stringify({
-    access_token: userData.access_token,
-    refresh_token: userData.refresh_token,
-    tokenInfo: userData.tokenInfo
-  }));
-  
-  // 更新当前用户信息
-  currentUser = {
-    id: userData.user_id,
-    name: userData.name
-  };
-};
-
-// 清除用户信息
-const clearUserInfo = () => {
-  localStorage.removeItem('feishu_token');
-  localStorage.removeItem('isLoggedIn');
-  localStorage.removeItem('userId');
-  localStorage.removeItem('userName');
-  localStorage.removeItem('userAvatar');
-  currentUser = null;
-};
-
-// 显示主界面和头像
-const showMainUI = () => {
-  document.getElementById('loginUI').style.display = 'none';
-  document.getElementById('mainUI').classList.remove('d-none');
-  const avatarUrl = localStorage.getItem('userAvatar');
-  const userName = localStorage.getItem('userName');
-  showUserAvatar(avatarUrl, userName);
-
-  // 登录成功后再加载配件数据（只加载一次）
-  if (!window.partsData) {
-    fetch('https://pn.jsjs.net/pn', { cache: 'force-cache' })
-      .then(res => res.json())
-      .then(data => {
-        window.partsData = data;
-        window.partsDataReady = true;
-        window.dispatchEvent(new Event('partsDataLoaded'));
+  if (code) {
+    handleLoginCallback({ code, type: state === 'scan' ? 'scan' : 'feishu' })
+      .then(() => {
+        showMainUI();
+        loadChatList();
+        window.history.replaceState({}, document.title, window.location.pathname);
       })
-      .catch(err => {
-        console.error('加载配件数据失败:', err);
+      .catch(() => {
+        showLoginUI();
+        initQRLogin();
       });
+  } else if (isTokenValid()) {
+    showMainUI();
+    loadChatList();
+  } else {
+    showLoginUI();
+    initQRLogin();
   }
 };
 
-// 显示扫码界面
-const showLoginUI = () => {
-  document.getElementById('loginUI').style.display = 'block';
-  document.getElementById('mainUI').classList.add('d-none');
-  showUserAvatar();
-};
-
-// 头像渲染函数
-const showUserAvatar = (avatarUrl, userName) => {
-  setTimeout(() => {
-    const h1 = document.querySelector('h1');
-    if (!h1) return;
-    const img = h1.querySelector('img');
-    if (!img) return;
-    img.src = avatarUrl;
-    if (userName) img.title = userName;
-    if (userName) img.alt = userName;
-    console.log('showUserAvatar set', img.src, img.title);
-  }, 100);
-};
-
-// 初始化二维码登录
-const initQRLogin = () => {
-  const state = 'scan'; // 固定为 scan，用于标识扫码登录
-  const goto = `https://accounts.feishu.cn/open-apis/authen/v1/authorize?` +
-    new URLSearchParams({
-      client_id: FEISHU_CONFIG.client_id,
-      redirect_uri: FEISHU_CONFIG.redirect_uri,
-      response_type: 'code',
-      state
-    }).toString();
-  const QRLoginObj = QRLogin({
-    id: "login_container",
-    goto,
-    width: "300",
-    height: "300"
-  });
-  const handleMessage = (event) => {
-    if (QRLoginObj.matchOrigin(event.origin) && QRLoginObj.matchData(event.data)) {
-      window.location.href = `${goto}&tmp_code=${event.data.tmp_code}`;
-    }
-  };
-  window.addEventListener('message', handleMessage, false);
-};
-
-// 登录回调处理
 const handleLoginCallback = async ({ code, type }) => {
   try {
     console.log('开始处理登录回调:', { code, type });
@@ -155,7 +68,6 @@ const handleLoginCallback = async ({ code, type }) => {
   }
 };
 
-// 检查登录状态
 const checkLogin = () => {
   try {
     const urlParams = new URLSearchParams(window.location.search);
@@ -217,7 +129,57 @@ const checkLogin = () => {
   }
 };
 
-// 加载群列表
+const showMainUI = () => {
+  document.getElementById('loginUI').style.display = 'none';
+  document.getElementById('mainUI').classList.remove('d-none');
+  const avatarUrl = localStorage.getItem('userAvatar');
+  const userName = localStorage.getItem('userName');
+  showUserAvatar(avatarUrl, userName);
+
+  // 登录成功后再加载配件数据（只加载一次）
+  if (!window.partsData) {
+    fetch('https://pn.jsjs.net/pn', { cache: 'force-cache' })
+      .then(res => res.json())
+      .then(data => {
+        window.partsData = data;
+        window.partsDataReady = true;
+        window.dispatchEvent(new Event('partsDataLoaded'));
+      })
+      .catch(err => {
+        console.error('加载配件数据失败:', err);
+      });
+  }
+};
+
+const showLoginUI = () => {
+  document.getElementById('loginUI').style.display = 'block';
+  document.getElementById('mainUI').classList.add('d-none');
+  // 不再调用 showUserAvatar();
+};
+
+const initQRLogin = () => {
+  const state = 'scan'; // 固定为 scan，用于标识扫码登录
+  const goto = `https://accounts.feishu.cn/open-apis/authen/v1/authorize?` +
+    new URLSearchParams({
+      client_id: FEISHU_CONFIG.client_id,
+      redirect_uri: FEISHU_CONFIG.redirect_uri,
+      response_type: 'code',
+      state
+    }).toString();
+  const QRLoginObj = QRLogin({
+    id: "login_container",
+    goto,
+    width: "300",
+    height: "300"
+  });
+  const handleMessage = (event) => {
+    if (QRLoginObj.matchOrigin(event.origin) && QRLoginObj.matchData(event.data)) {
+      window.location.href = `${goto}&tmp_code=${event.data.tmp_code}`;
+    }
+  };
+  window.addEventListener('message', handleMessage, false);
+};
+
 const loadChatList = async () => {
   const userId = localStorage.getItem('userId');
   if (!userId) {
@@ -251,35 +213,56 @@ const loadChatList = async () => {
   }
 };
 
-// 页面初始化
-const loginInit = () => {
-  const urlParams = new URLSearchParams(window.location.search);
-  const code = urlParams.get('code');
-  const state = urlParams.get('state');
-
-  if (code) {
-    handleLoginCallback({ code, type: state === 'scan' ? 'scan' : 'feishu' })
-      .then(() => {
-        showMainUI();
-        loadChatList();
-        window.history.replaceState({}, document.title, window.location.pathname);
-      })
-      .catch(() => {
-        showLoginUI();
-        initQRLogin();
-      });
-  } else if (isTokenValid()) {
-    showMainUI();
-    loadChatList();
-  } else {
-    showLoginUI();
-    initQRLogin();
-  }
+// 3. 辅助函数
+const saveUserInfo = (userData) => {
+  if (!userData) return;
+  localStorage.setItem('isLoggedIn', 'true');
+  localStorage.setItem('userId', userData.user_id);
+  localStorage.setItem('userName', userData.name);
+  localStorage.setItem('userAvatar', userData.avatar_url);
+  localStorage.setItem('feishu_token', JSON.stringify({
+    access_token: userData.access_token,
+    refresh_token: userData.refresh_token,
+    tokenInfo: userData.tokenInfo
+  }));
+  currentUser = {
+    id: userData.user_id,
+    name: userData.name
+  };
 };
+
+const clearUserInfo = () => {
+  localStorage.removeItem('feishu_token');
+  localStorage.removeItem('isLoggedIn');
+  localStorage.removeItem('userId');
+  localStorage.removeItem('userName');
+  localStorage.removeItem('userAvatar');
+  currentUser = null;
+};
+
+const isTokenValid = () => {
+  const tokenInfo = JSON.parse(localStorage.getItem('feishu_token') || '{}');
+  return !!tokenInfo.access_token;
+};
+
+const showUserAvatar = (avatarUrl, userName) => {
+  setTimeout(() => {
+    const h1 = document.querySelector('h1');
+    if (!h1) return;
+    const img = h1.querySelector('img');
+    if (!img) return;
+    img.src = avatarUrl;
+    if (userName) img.title = userName;
+    if (userName) img.alt = userName;
+    console.log('showUserAvatar set', img.src, img.title);
+  }, 100);
+};
+
+// 4. 事件绑定
 
 document.addEventListener('DOMContentLoaded', loginInit);
 
-// 导出需要给pda.js用的函数
+// 5. 导出
 window.loginUtils = {
   isTokenValid,
   showMainUI,
