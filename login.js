@@ -7,6 +7,63 @@ const FEISHU_CONFIG = {
 };
 let currentUser = null;
 
+// 2. 主流程相关函数（initQRLogin、loadChatList放最上面）
+const initQRLogin = () => {
+  const state = 'scan'; // 固定为 scan，用于标识扫码登录
+  const goto = `https://accounts.feishu.cn/open-apis/authen/v1/authorize?` +
+    new URLSearchParams({
+      client_id: FEISHU_CONFIG.client_id,
+      redirect_uri: FEISHU_CONFIG.redirect_uri,
+      response_type: 'code',
+      state
+    }).toString();
+  const QRLoginObj = QRLogin({
+    id: "login_container",
+    goto,
+    width: "300",
+    height: "300"
+  });
+  const handleMessage = (event) => {
+    if (QRLoginObj.matchOrigin(event.origin) && QRLoginObj.matchData(event.data)) {
+      window.location.href = `${goto}&tmp_code=${event.data.tmp_code}`;
+    }
+  };
+  window.addEventListener('message', handleMessage, false);
+};
+
+const loadChatList = async () => {
+  const userId = localStorage.getItem('userId');
+  if (!userId) {
+    console.warn('未登录，无法获取群列表');
+    return;
+  }
+  try {
+    const res = await fetch('https://pdabot.jsjs.net/api/chat-list', {
+      headers: {
+        'Authorization': 'Bearer ' + userId
+      }
+    });
+    const data = await res.json();
+    if (data.code === 401) {
+      console.error('未授权访问群列表');
+      return;
+    }
+    if (data.code === 0 && data.data && data.data.items) {
+      const chatSelect = document.getElementById('chatSelect');
+      if (chatSelect) {
+        chatSelect.innerHTML = '<option value="">请选择要发送的群</option>' + 
+          data.data.items.map(chat => 
+            `<option value="${chat.chat_id}">${chat.name}</option>`
+          ).join('');
+      }
+    } else {
+      console.warn('群列表数据格式错误');
+    }
+  } catch (e) {
+    console.error('加载群列表失败:', e);
+  }
+};
+
 // 2. 主流程函数
 const loginInit = () => {
   const urlParams = new URLSearchParams(window.location.search);
@@ -155,62 +212,6 @@ const showLoginUI = () => {
   document.getElementById('loginUI').style.display = 'block';
   document.getElementById('mainUI').classList.add('d-none');
   // 不再调用 showUserAvatar();
-};
-
-const initQRLogin = () => {
-  const state = 'scan'; // 固定为 scan，用于标识扫码登录
-  const goto = `https://accounts.feishu.cn/open-apis/authen/v1/authorize?` +
-    new URLSearchParams({
-      client_id: FEISHU_CONFIG.client_id,
-      redirect_uri: FEISHU_CONFIG.redirect_uri,
-      response_type: 'code',
-      state
-    }).toString();
-  const QRLoginObj = QRLogin({
-    id: "login_container",
-    goto,
-    width: "300",
-    height: "300"
-  });
-  const handleMessage = (event) => {
-    if (QRLoginObj.matchOrigin(event.origin) && QRLoginObj.matchData(event.data)) {
-      window.location.href = `${goto}&tmp_code=${event.data.tmp_code}`;
-    }
-  };
-  window.addEventListener('message', handleMessage, false);
-};
-
-const loadChatList = async () => {
-  const userId = localStorage.getItem('userId');
-  if (!userId) {
-    console.warn('未登录，无法获取群列表');
-    return;
-  }
-  try {
-    const res = await fetch('https://pdabot.jsjs.net/api/chat-list', {
-      headers: {
-        'Authorization': 'Bearer ' + userId
-      }
-    });
-    const data = await res.json();
-    if (data.code === 401) {
-      console.error('未授权访问群列表');
-      return;
-    }
-    if (data.code === 0 && data.data && data.data.items) {
-      const chatSelect = document.getElementById('chatSelect');
-      if (chatSelect) {
-        chatSelect.innerHTML = '<option value="">请选择要发送的群</option>' + 
-          data.data.items.map(chat => 
-            `<option value="${chat.chat_id}">${chat.name}</option>`
-          ).join('');
-      }
-    } else {
-      console.warn('群列表数据格式错误');
-    }
-  } catch (e) {
-    console.error('加载群列表失败:', e);
-  }
 };
 
 // 3. 辅助函数
