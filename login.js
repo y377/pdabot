@@ -254,9 +254,18 @@ const showUserAvatar = (avatarUrl, userName) => {
     const img = h1.querySelector('img');
     if (!img) return;
     img.src = avatarUrl;
-    if (userName) img.title = userName;
-    if (userName) img.alt = userName;
-    console.log('showUserAvatar set', img.src, img.title);
+    if (userName) {
+      img.setAttribute('data-bs-title', userName);
+    }
+    // 初始化所有tooltip
+    const tooltipTriggerList = document.querySelectorAll('[data-bs-toggle="tooltip"]');
+    [...tooltipTriggerList].forEach(el => {
+      if (!el._tooltip_inited) {
+        new bootstrap.Tooltip(el);
+        el._tooltip_inited = true;
+      }
+    });
+    // console.log('showUserAvatar set', img.src, userName);
   }, 100);
 };
 
