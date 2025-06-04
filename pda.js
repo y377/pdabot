@@ -637,8 +637,8 @@ const sendToFeishu = () => {
       }
       return (oldPN.value || '').trim();
     })(),
-    user_name: (window.loginUtils.currentUser && window.loginUtils.currentUser.name) ? window.loginUtils.currentUser.name : '',
-    user_id: (window.loginUtils.currentUser && window.loginUtils.currentUser.id) ? window.loginUtils.currentUser.id : '',
+    user_name: localStorage.getItem('userName') || '',
+    user_id: localStorage.getItem('userId') || '',
     access_token: tokenInfo.access_token,
     refresh_token: tokenInfo.refresh_token,
     expireTime: tokenInfo.expireTime
