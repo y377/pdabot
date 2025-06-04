@@ -50,10 +50,15 @@ const loadChatList = async () => {
     if (data.code === 0 && data.data && data.data.items) {
       const chatSelect = document.getElementById('chatSelect');
       if (chatSelect) {
-        chatSelect.innerHTML = '<option value="">请选择要发送的群</option>' + 
-          data.data.items.map(chat => 
-            `<option value="${chat.chat_id}">${chat.name}</option>`
-          ).join('');
+        // 只保留第一个默认选项
+        chatSelect.length = 1;
+        // 动态添加群选项
+        data.data.items.forEach(chat => {
+          const option = document.createElement('option');
+          option.value = chat.chat_id;
+          option.textContent = chat.name;
+          chatSelect.appendChild(option);
+        });
       }
     } else {
       console.warn('群列表数据格式错误');
@@ -156,7 +161,12 @@ const checkLogin = () => {
             toast.setAttribute('role', 'alert');
             toast.setAttribute('aria-live', 'assertive');
             toast.setAttribute('aria-atomic', 'true');
-            toast.innerHTML = `<div class="toast-body">登录失败: ${error.message}</div>`;
+            // 安全地添加内容
+            const toastBody = document.createElement('div');
+            toastBody.className = 'toast-body';
+            toastBody.textContent = `登录失败: ${error.message}`;
+            toast.appendChild(toastBody);
+
             toastContainer.appendChild(toast);
             const bsToast = new bootstrap.Toast(toast, {
               animation: true,
