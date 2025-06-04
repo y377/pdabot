@@ -15,7 +15,6 @@ const initQRLogin = () => {
       client_id: FEISHU_CONFIG.client_id,
       redirect_uri: FEISHU_CONFIG.redirect_uri,
       response_type: 'code'
-      // state
     }).toString();
   const QRLoginObj = QRLogin({
     id: "login_container",
@@ -76,6 +75,8 @@ const loginInit = () => {
         showMainUI();
         loadChatList();
         window.history.replaceState({}, document.title, window.location.pathname);
+        // 登录成功后强制刷新页面，确保token生效
+        window.location.reload();
       })
       .catch(() => {
         showLoginUI();
