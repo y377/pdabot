@@ -2,7 +2,7 @@
 
 // 1. 配置和全局变量
 const FEISHU_CONFIG = {
-  client_id: 'cli_a8b10d009ef8d00c',
+  client_id: 'cli_a8bfe46f2e6e500b',
   redirect_uri: 'https://pdabot.jsjs.net/'
 };
 let currentUser = null;
