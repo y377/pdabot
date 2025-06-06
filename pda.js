@@ -647,7 +647,7 @@ const sendToFeishu = () => {
   // 调试输出
   console.log('发送到worker的数据:', JSON.stringify({
     title: `更换通知 - ${type}`,
-    orderNo: orderNum,
+    orderNo: orderUrl,
     chatId: chatId,
     data: data
   }));
@@ -659,7 +659,7 @@ const sendToFeishu = () => {
     },
     body: JSON.stringify({
       title: `更换通知 - ${type}`,
-      orderNo: orderNum,
+      orderNo: orderUrl,
       chatId: chatId,
       data: data
     }),
