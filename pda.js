@@ -616,9 +616,11 @@ const sendToFeishu = () => {
 
   // 取表单内容，变量名与卡片模板一致，全部转为字符串
   const data = {
-    shangxin_xiajiu: `更换「${type || ''}」`,
+    shangxin_xiajiu: `${type || ''}`,
     danhao: orderNum + '',
-    fuwuqi_sn: type === "光模块" ? `${switchLocation.value.trim()} ${portNo.value.trim()}` : (serverSN.value || '').trim(),
+    position: (switchLocation.value || '').trim(),
+    port: (portNo.value || '').trim(),
+    fuwuqi_sn: (serverSN.value || '').trim(),
     xinpin_pinpai: (newBrand.value || '').trim(),
     xinpin_sn: (newSN.value || '').trim(),
     xinpin_pn: (() => {
