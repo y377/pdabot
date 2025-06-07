@@ -618,7 +618,7 @@ const sendToFeishu = () => {
   const data = {
     shangxin_xiajiu: `更换「${type || ''}」`,
     danhao: orderNum + '',
-    fuwuqi_sn: (serverSN.value || '').trim(),
+    fuwuqi_sn: type === "光模块" ? `${switchLocation.value.trim()} ${portNo.value.trim()}` : (serverSN.value || '').trim(),
     xinpin_pinpai: (newBrand.value || '').trim(),
     xinpin_sn: (newSN.value || '').trim(),
     xinpin_pn: (() => {
