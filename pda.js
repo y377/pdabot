@@ -1192,7 +1192,31 @@ function initFormValidation() {
   const selects = form.querySelectorAll('select[required]');
   selects.forEach(select => {
     select.addEventListener('change', () => {
-      if (select.value && select.value !== '请选择' && select.value !== '') {
+      // 检查是否选择了有效选项（不是空值或禁用选项）
+      const selectedOption = select.options[select.selectedIndex];
+      const isValidSelection = select.value && 
+                              select.value !== '' && 
+                              !selectedOption.disabled &&
+                              select.value !== '请选择' && 
+                              select.value !== '请选择群';
+      
+      if (isValidSelection) {
+        select.classList.remove('is-invalid');
+        select.classList.add('is-valid');
+      } else {
+        select.classList.remove('is-valid');
+        select.classList.add('is-invalid');
+      }
+    });
+    
+    // 初始验证状态
+    select.addEventListener('blur', () => {
+      const selectedOption = select.options[select.selectedIndex];
+      const isValidSelection = select.value && 
+                              select.value !== '' && 
+                              !selectedOption.disabled;
+      
+      if (isValidSelection) {
         select.classList.remove('is-invalid');
         select.classList.add('is-valid');
       } else {
