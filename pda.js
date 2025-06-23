@@ -26,14 +26,56 @@ const preview = document.getElementById("preview");
 const copyBtn = document.getElementById("copyBtn");
 
 const orderNoDisplay = document.getElementById("orderNoDisplay");
+const copyOrderNoBtn = document.getElementById("copyOrderNoBtn");
+
+let restoring = false;
+let currentUser = null;  // 存储当前登录用户信息
+let justLoggedIn = false;
 
 orderNo.addEventListener("input", function () {
   const val = orderNo.value.trim();
   const num = val.match(/(\d+)(?!.*\d)/)?.[0] || "";
   orderNoDisplay.textContent = num ? `${num}` : ""; //单号识别：${num}
+  
+  // 显示或隐藏复制按钮，并更新复制文本
+  if (num) {
+    copyOrderNoBtn.style.display = "inline-block";
+    copyOrderNoBtn.setAttribute("data-clipboard-text", num);
+  } else {
+    copyOrderNoBtn.style.display = "none";
+    copyOrderNoBtn.setAttribute("data-clipboard-text", "");
+  }
 });
 
-const showToast = (msg, type = "primary", delay = 5000) => {
+// 初始化 Clipboard.js
+document.addEventListener('DOMContentLoaded', function() {
+  // 初始化单号复制按钮
+  const clipboardOrderNo = new ClipboardJS('#copyOrderNoBtn');
+  
+  clipboardOrderNo.on('success', function(e) {
+    const text = e.text;
+    showToast(`单号 ${text} 已复制到剪贴板`, "success");
+    e.clearSelection();
+  });
+  
+  clipboardOrderNo.on('error', function(e) {
+    showToast("复制失败，请手动复制", "warning");
+  });
+
+  // 初始化预览复制按钮
+  const clipboardPreview = new ClipboardJS('#copyBtn');
+  
+  clipboardPreview.on('success', function(e) {
+    showToast("已复制到剪贴板", "success");
+    e.clearSelection();
+  });
+  
+  clipboardPreview.on('error', function(e) {
+    showToast("复制失败，请手动复制", "warning");
+  });
+});
+
+function showToast(msg, type = "primary", delay = 5000) {
   const container = document.getElementById("toastContainer");
   if (!container) {
     return;
@@ -54,9 +96,9 @@ const showToast = (msg, type = "primary", delay = 5000) => {
   });
   bsToast.show();
   toast.addEventListener('hidden.bs.toast', () => toast.remove());
-};
+}
 
-const updateBrandOptions = () => {
+function updateBrandOptions() {
   if (!window.partsData || !window.partsData.brandMap) return;
   const type = typeSelect.value;
   const brandMap = window.partsData.brandMap;
@@ -96,10 +138,10 @@ const updateBrandOptions = () => {
   section.classList.remove("d-none");
   updatePnOptions(type, newBrand.value, newPnOptions);
   updatePnOptions(type, oldBrand.value, oldPnOptions);
-};
+}
 
 // 添加等待数据加载函数
-const waitForData = () => {
+function waitForData() {
   return new Promise((resolve) => {
     if (window.partsData && window.partsData.brandMap) {
       resolve();
@@ -114,10 +156,190 @@ const waitForData = () => {
       checkData();
     }
   });
-};
+}
+
+// 登录回调统一处理
+async function handleLoginCallback({ code, type }) {
+  let url = '';
+  if (type === 'scan') {
+    url = 'https://pdabot.jsjs.net/auth/scan';
+  } else if (type === 'feishu') {
+    url = 'https://pdabot.jsjs.net/auth/feishu';
+  }
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ code })
+  });
+  const data = await res.json();
+  if (data.code === 0) {
+    localStorage.setItem('isLoggedIn', 'true');
+    localStorage.setItem('userId', data.data.user_id);
+    localStorage.setItem('openId', data.data.open_id);
+    localStorage.setItem('userName', data.data.name);
+    localStorage.setItem('accessToken', data.data.access_token);
+    currentUser = { id: data.data.user_id, name: data.data.name };
+    showMainUI(data.data.name);
+    loadChatList();
+  } else {
+    showToast('登录失败', 'danger');
+    showLoginUI();
+  }
+}
+
+// 修改 redirectToFeishuLogin 函数
+function redirectToFeishuLogin() {
+  const client_id = 'cli_a8be137e6579500b';
+  const redirect_uri = encodeURIComponent('https://pdabot.jsjs.net/');
+  const state = Math.random().toString(36).slice(2);
+  const url = `https://passport.feishu.cn/suite/passport/oauth/authorize?client_id=${client_id}&redirect_uri=${redirect_uri}&response_type=code&state=${state}`;
+  window.location.href = url;
+}
+
+// 修改 checkLogin 函数
+function checkLogin() {
+  try {
+    const urlParams = new URLSearchParams(window.location.search);
+    const code = urlParams.get('code');
+    const state = urlParams.get('state');
+    
+    if (code) {
+      // 有 code 参数，说明是飞书登录回调
+      console.log('检测到登录回调，code:', code);
+      // 根据 state 判断是扫码还是免密登录
+      if (state === 'scan') {
+        handleFeishuCallback(code);
+      } else {
+        handleFeishuAuthCallback(code);
+      }
+    } else {
+      // 检查 localStorage 中的登录状态
+      const isLoggedIn = localStorage.getItem('isLoggedIn') === 'true';
+      const userId = localStorage.getItem('userId');
+      const userName = localStorage.getItem('userName');
+      
+      if (isLoggedIn && userId && userName) {
+        // 已登录，显示主界面
+        currentUser = { id: userId, name: userName };
+        showMainUI(userName);
+        loadChatList();
+      } else {
+        // 未登录，显示登录界面
+        showLoginUI();
+      }
+    }
+  } catch (error) {
+    console.error('检查登录状态失败:', error);
+    showLoginUI();
+  }
+}
+
+// 修改扫码登录回调
+async function handleFeishuCallback(code) {
+  if (!code) {
+    showToast('登录失败：缺少授权码', 'danger');
+    return;
+  }
+  try {
+    console.log('开始扫码登录，code:', code);
+    const res = await fetch('https://pdabot.jsjs.net/auth/scan', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ code })
+    });
+    const data = await res.json();
+    console.log('扫码登录响应:', data);
+    if (data.code === 0) {
+      localStorage.setItem('isLoggedIn', 'true');
+      localStorage.setItem('userId', data.data.user_id);
+      localStorage.setItem('openId', data.data.open_id);
+      localStorage.setItem('userName', data.data.name);
+      localStorage.setItem('accessToken', data.data.access_token);
+      currentUser = { id: data.data.user_id, name: data.data.name };
+      showMainUI(data.data.name);
+      loadChatList();
+    } else {
+      showToast(`登录失败: ${data.msg || '未知错误'}`, 'danger');
+      showLoginUI();
+    }
+  } catch (error) {
+    console.error('扫码登录失败:', error);
+    showToast('扫码登录失败', 'danger');
+    showLoginUI();
+  }
+}
+
+// 修改免密登录回调
+async function handleFeishuAuthCallback(code) {
+  console.log('检测到登录回调，code:', code);
+  if (!code) return;
+
+  try {
+    // 只使用一次code，不再重复调用免密登录
+    const response = await fetch('https://pdabot.jsjs.net/auth/feishu', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ code })
+    });
+
+    const result = await response.json();
+    console.log('登录响应:', result);
+
+    if (result.code === 0 && result.data) {
+      // 保存用户信息和token
+      localStorage.setItem('userInfo', JSON.stringify(result.data));
+      localStorage.setItem('access_token', result.data.access_token);
+      return true;
+    } else {
+      console.error('登录失败:', result.msg);
+      return false;
+    }
+  } catch (error) {
+    console.error('登录请求失败:', error);
+    return false;
+  }
+}
+
+// 修改 showMainUI 函数
+function showMainUI(userName) {
+  const loginContainer = document.getElementById('loginContainer');
+  const mainContainer = document.getElementById('mainContainer');
+  if (!loginContainer || !mainContainer) return;
+  loginContainer.classList.add('d-none');
+  mainContainer.classList.remove('d-none');
+  const h5 = document.querySelector('h5');
+  // 先移除旧的用户信息元素
+  const oldUserInfo = h5.querySelector('.user-info-tooltip');
+  if (oldUserInfo) oldUserInfo.remove();
+  // 新增：用户名用带Tooltips的图标按钮显示
+  const userInfoBtn = document.createElement('button');
+  userInfoBtn.type = 'button';
+  userInfoBtn.className = 'btn btn-sm btn-outline-secondary ms-2 user-info-tooltip';
+  userInfoBtn.setAttribute('data-bs-toggle', 'tooltip');
+  userInfoBtn.setAttribute('data-bs-placement', 'bottom');
+  userInfoBtn.setAttribute('title', userName);
+  userInfoBtn.innerHTML = '<i class="bi bi-person-circle"></i>';
+  h5.appendChild(userInfoBtn);
+  // 初始化Tooltips
+  if (window.bootstrap) {
+    new bootstrap.Tooltip(userInfoBtn);
+  }
+}
+
+function showLoginUI() {
+  const loginContainer = document.getElementById('loginContainer');
+  const mainContainer = document.getElementById('mainContainer');
+  if (!loginContainer || !mainContainer) {
+    return;
+  }
+  loginContainer.classList.remove('d-none');
+  mainContainer.classList.add('d-none');
+}
 
 // 封装初始化逻辑
-const mainInit = async () => {
+async function mainInit() {
   try {
     // 等待数据加载
     await waitForData();
@@ -164,23 +386,27 @@ const mainInit = async () => {
       elements.resetBtn.onclick = resetForm;
     }
     // 检查登录状态
-    window.loginUtils.checkLogin();
+    checkLogin();
   } catch (error) {
     console.error('页面初始化失败:', error);
   }
-};
+}
 
-// 保证 partsData 加载后再初始化
+// 修改页面加载事件，确保 partsData 加载后再初始化
+
+// 只要 partsData 没有加载好，就监听 partsDataLoaded 事件
 if (!window.partsData || !window.partsData.brandMap) {
   window.addEventListener('partsDataLoaded', () => {
     mainInit();
   }, { once: true });
 } else {
+  // 已经加载好，直接初始化
   document.addEventListener('DOMContentLoaded', mainInit);
 }
 
 // 修改 loadFormData 函数
-const loadFormData = async () => {
+async function loadFormData() {
+  restoring = true;
   try {
     // 1. 恢复类型
     const typeVal = localStorage.getItem('pda_type');
@@ -299,12 +525,13 @@ const loadFormData = async () => {
   } catch (error) {
     console.error('加载表单数据失败:', error);
   } finally {
+    restoring = false;
     update();
   }
-};
+}
 
 // 修改事件绑定函数
-const bindEvents = () => {
+function bindEvents() {
   if (typeSelect) {
     const typeChangeHandler = async () => {
       const type = typeSelect.value;
@@ -344,31 +571,16 @@ const bindEvents = () => {
       el.addEventListener("input", inputHandler);
     }
   });
-
-  if (copyBtn) {
-    const copyHandler = () => {
-      const text = preview.innerText.trim();
-      navigator.clipboard
-        .writeText(text)
-        .then(() => {
-          showToast("已复制到剪贴板");
-        })
-        .catch(() => {
-          showToast("复制失败，请手动复制", "danger");
-        });
-    };
-    copyBtn.addEventListener("click", copyHandler);
-  }
-};
+}
 
 // 生成硬盘PN下拉选项
-const renderDiskPnOptions = (datalist, brand) => {
+function renderDiskPnOptions(datalist, brand) {
   const list = window.partsData.diskPnList.filter((item) => item.brand === brand);
   datalist.innerHTML = `<option value="">请选择硬盘PN</option>` + list.map((item) => `<option value="${item.pn}">${item.pn}【${item.Type}】</option>`).join("");
-};
+}
 
 // 新增：切换PN输入框为select或input
-const switchPnInput = (type) => {
+function switchPnInput(type) {
   const isDisk = type === "硬盘";
   const isCpu = type === "CPU";
   // 新件PN
@@ -423,10 +635,10 @@ const switchPnInput = (type) => {
     if (oldPnSelect) oldPnSelect.style.display = "none";
     oldPN.style.display = "";
   }
-};
+}
 
 // 监听硬盘PN select 的变化，实时更新预览
-const bindPNSelectUpdate = () => {
+function bindPNSelectUpdate() {
   ["newPNSelect", "oldPNSelect"].forEach(id => {
     const sel = document.getElementById(id);
     if (sel) {
@@ -434,10 +646,11 @@ const bindPNSelectUpdate = () => {
       sel.addEventListener("change", update);
     }
   });
-};
+}
 
 // 修改updatePnOptions函数
-const updatePnOptions = (type, brand, datalist) => {
+function updatePnOptions(type, brand, datalist) {
+  if (restoring) return;
   if (type === "硬盘") {
     renderDiskPnOptions(datalist, brand);
     // 同步select
@@ -460,20 +673,21 @@ const updatePnOptions = (type, brand, datalist) => {
     const list = (window.partsData.pnDataMap[type] && window.partsData.pnDataMap[type][brand]) || [];
     datalist.innerHTML = list.map((pn) => `<option value="${pn}">`).join("");
   }
-};
+}
 
 // 生成CPU PN下拉选项
-const renderCpuPnOptions = (datalist, brand) => {
+function renderCpuPnOptions(datalist, brand) {
   const list = window.partsData.cpuPnList.filter((item) => item.brand === brand);
   datalist.innerHTML = `<option value="">请选择CPU型号</option>` + list.map((item) => `<option value="${item.pn}">${item.pn}</option>`).join("");
-};
+}
 
-const formatSamsungMemoryPn = (pn) => {
+function formatSamsungMemoryPn(pn) {
   const index = pn.indexOf("M");
   return index !== -1 ? pn.slice(index) : pn;
-};
+}
 
-const update = () => {
+function update() {
+  if (restoring) return;
   const type = typeSelect.value;
   const order = orderNo.value.trim().match(/\d+/)?.[0] || "";
   const isOptical = type === "光模块";
@@ -572,10 +786,10 @@ const update = () => {
   }
   hljs.highlightElement(preview);
   saveFormData();
-};
+}
 
 // 新增：将Markdown表格转为对象
-const markdownTableToObject = (md) => {
+function markdownTableToObject(md) {
   const lines = md.trim().split('\n').filter(line => line.includes('|'));
   const obj = {};
   for (let i = 2; i < lines.length; i++) { // 跳过表头和分隔线
@@ -583,10 +797,10 @@ const markdownTableToObject = (md) => {
     obj[key] = value;
   }
   return obj;
-};
+}
 
-// 修改发送卡片函数
-const sendToFeishu = () => {
+// 修改 sendToFeishu，传递对象数据
+function sendToFeishu() {
   const type = typeSelect.value;
   const orderInput = orderNo.value.trim();
   const chatId = document.getElementById('chatSelect').value;
@@ -606,20 +820,11 @@ const sendToFeishu = () => {
     showToast("链接中未找到单号数字", "warning");
     return;
   }
-
-  // 获取存储的 token 信息
-  const tokenInfo = JSON.parse(localStorage.getItem('feishu_token') || '{}');
-  if (!tokenInfo.access_token) {
-    showToast('登录已过期，请重新登录', 'warning');
-    return;
-  }
-
   // 取表单内容，变量名与卡片模板一致，全部转为字符串
+  const user_access_token = localStorage.getItem('accessToken') || '';
   const data = {
-    shangxin_xiajiu: `${type || ''}`,
+    shangxin_xiajiu: `更换「${type || ''}」`,
     danhao: orderNum + '',
-    position: (switchLocation.value || '').trim(),
-    port: (portNo.value || '').trim(),
     fuwuqi_sn: (serverSN.value || '').trim(),
     xinpin_pinpai: (newBrand.value || '').trim(),
     xinpin_sn: (newSN.value || '').trim(),
@@ -639,21 +844,17 @@ const sendToFeishu = () => {
       }
       return (oldPN.value || '').trim();
     })(),
-    user_name: localStorage.getItem('userName') || '',
-    user_id: localStorage.getItem('userId') || '',
-    access_token: tokenInfo.access_token,
-    refresh_token: tokenInfo.refresh_token,
-    expireTime: tokenInfo.expireTime
+    user_name: (currentUser && currentUser.name) ? currentUser.name : '',
+    user_var: { id: (currentUser && currentUser.id) ? currentUser.id : '' },
+    user_access_token: user_access_token
   };
-
   // 调试输出
   console.log('发送到worker的数据:', JSON.stringify({
     title: `更换通知 - ${type}`,
-    orderNo: orderUrl,
+    orderNo: orderNum,
     chatId: chatId,
     data: data
   }));
-
   fetch("https://pdabot.jsjs.net/api/send-card", {
     method: "POST",
     headers: {
@@ -661,7 +862,7 @@ const sendToFeishu = () => {
     },
     body: JSON.stringify({
       title: `更换通知 - ${type}`,
-      orderNo: orderUrl,
+      orderNo: orderNum,
       chatId: chatId,
       data: data
     }),
@@ -670,14 +871,10 @@ const sendToFeishu = () => {
       const data = await res.json();
       if (data.code === 0) {
         showToast("卡片消息已发送 ✅", "success");
+        // 打印 message_id
         console.log('飞书返回的 message_id:', data.data && data.data.message_id);
-      } else if (data.code === 401 && data.msg === 'token已刷新') {
-        // 处理 token 刷新
-        localStorage.setItem('feishu_token', JSON.stringify(data.data));
-        showToast('登录已刷新，正在重试...', 'info');
-        // 重试发送
-        sendToFeishu();
       } else {
+        // 提取详细错误信息
         let detail = data.msg || '未知错误';
         if (data.error && data.error.field_violations) {
           detail += '：' + data.error.field_violations.map(v => `${v.field}: ${v.description}`).join('; ');
@@ -688,10 +885,10 @@ const sendToFeishu = () => {
     .catch((err) => {
       showToast(`发送失败 ❌ (${err.message || err})`, "danger");
     });
-};
+}
 
 // 修改 sendApplyNotify 函数
-const sendApplyNotify = () => {
+function sendApplyNotify() {
   const orderInput = orderNo.value.trim();
   const urlMatch = orderInput.match(/https?:\/\/[\S]+/);
   if (!urlMatch) {
@@ -728,7 +925,7 @@ const sendApplyNotify = () => {
       sn2,
       pn2,
       partType: typeSelect.value,
-      sender: (window.loginUtils.currentUser && window.loginUtils.currentUser.name) ? window.loginUtils.currentUser.name : '未知用户'
+      sender: currentUser ? currentUser.name : '未知用户'
     }),
   })
   .then(async res => {
@@ -742,20 +939,22 @@ const sendApplyNotify = () => {
   .catch(() => {
     showToast('申领通知发送失败 ❌', 'danger');
   });
-};
+}
 
 // 获取PN值（兼容input和select）
-const getPNValue = (type) => {
+function getPNValue(type) {
   const input = document.getElementById(type === "new" ? "newPN" : "oldPN");
   const select = document.getElementById(type === "new" ? "newPNSelect" : "oldPNSelect");
   if (select && select.style.display !== "none") {
     return select.value;
   }
   return input.value;
-};
+}
 
 // 保存表单数据
-const saveFormData = () => {
+function saveFormData() {
+  if (restoring) return;
+  
   // 保存类型
   const typeVal = typeSelect.value;
   if (typeVal && typeVal !== "请选择") {
@@ -795,37 +994,36 @@ const saveFormData = () => {
       localStorage.removeItem(key);
     }
   });
-};
+}
 
 // 监听所有表单项的变化，自动保存
 [orderNo, switchLocation, portNo, serverSN, newSN, oldSN, newPN, oldPN, typeSelect, newBrand, oldBrand].forEach((el) => {
   if (el) {
     el.addEventListener("input", saveFormData);
     el.addEventListener("change", saveFormData);
-    el.addEventListener("paste", () => {
+    el.addEventListener("paste", function () {
       setTimeout(saveFormData, 0);
     });
   }
 });
 
 // select PN 变化也要保存（动态生成的select也要绑定）
-const bindPNSelectSave = () => {
+function bindPNSelectSave() {
   ["newPNSelect", "oldPNSelect"].forEach((id) => {
     const sel = document.getElementById(id);
     if (sel) {
       sel.onchange = saveFormData;
     }
   });
-};
-
-document.addEventListener("change", (e) => {
+}
+document.addEventListener("change", function (e) {
   if (e.target && (e.target.id === "newPNSelect" || e.target.id === "oldPNSelect")) {
     saveFormData();
   }
 });
 
 // 重置按钮
-const resetForm = () => {
+function resetForm() {
   if (confirm("确定要重置所有数据吗？")) {
     ["pda_orderNo", "pda_type", "pda_switchLocation", "pda_portNo", "pda_serverSN", "pda_newBrand", "pda_oldBrand", "pda_newPN", "pda_oldPN", "pda_newSN", "pda_oldSN"].forEach((key) =>
       localStorage.removeItem(key)
@@ -833,6 +1031,7 @@ const resetForm = () => {
     // 清空表单
     orderNo.value = "";
     orderNoDisplay.textContent = ""; // 清除单号显示
+    copyOrderNoBtn.style.display = "none"; // 隐藏复制按钮
     switchLocation.value = "";
     portNo.value = "";
     serverSN.value = "";
@@ -854,4 +1053,39 @@ const resetForm = () => {
       });
     }
   }
-}; 
+}
+
+// 新增：加载群列表
+async function loadChatList() {
+  const userId = localStorage.getItem('userId');
+  if (!userId) {
+    showToast('未登录，无法获取群列表', 'warning');
+    return;
+  }
+  try {
+    const res = await fetch('https://pdabot.jsjs.net/api/chat-list', {
+      headers: {
+        'Authorization': 'Bearer ' + userId
+      }
+    });
+    const data = await res.json();
+    if (data.code === 401) {
+      showToast('未授权访问群列表', 'danger');
+      return;
+    }
+    if (data.code === 0 && data.data && data.data.items) {
+      const chatSelect = document.getElementById('chatSelect');
+      if (chatSelect) {
+        chatSelect.innerHTML = '<option value="">请选择要发送的群</option>' + 
+          data.data.items.map(chat => 
+            `<option value="${chat.chat_id}">${chat.name}</option>`
+          ).join('');
+      }
+    } else {
+      showToast('群列表数据格式错误', 'warning');
+    }
+  } catch (e) {
+    console.error('加载群列表失败:', e);
+    showToast('群列表加载失败', 'danger');
+  }
+} 
