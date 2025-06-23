@@ -3,17 +3,51 @@ export const feishuAutoLogin = async () => {
   // 检测是否在飞书客户端内
   const isInFeishuClient = () => {
     const ua = navigator.userAgent;
-    const isFeishuApp = /Lark|Feishu/.test(ua);
+    const isFeishuApp = /Lark|Feishu|feishu|lark/i.test(ua);
     const hasTTAPI = typeof window.tt !== 'undefined';
     const hasJSAPI = typeof window.tt?.requestAccess !== 'undefined' || 
                      typeof window.tt?.requestAuthCode !== 'undefined';
     
-    console.log('飞书客户端检测:', { 
+    // 安卓特定检测
+    const isAndroid = /Android/i.test(ua);
+    const isFeishuAndroid = isAndroid && (isFeishuApp || /feishu|lark/i.test(ua));
+    
+    // Windows特定检测
+    const isWindows = /Windows/i.test(ua);
+    const isFeishuWindows = isWindows && (isFeishuApp || /feishu|lark/i.test(ua));
+    
+    // 检查其他可能的飞书API
+    const hasFeishuAPI = typeof window.feishu !== 'undefined' || 
+                         typeof window.lark !== 'undefined' ||
+                         typeof window.ttWebView !== 'undefined';
+    
+    // 检查Electron环境（Windows飞书客户端使用Electron）
+    const isElectron = /Electron/i.test(ua);
+    
+    console.log('飞书客户端检测详情:', { 
+      userAgent: ua,
       isFeishuApp, 
       hasTTAPI, 
-      hasJSAPI, 
-      userAgent: ua 
+      hasJSAPI,
+      isAndroid,
+      isFeishuAndroid,
+      isWindows,
+      isFeishuWindows,
+      isElectron,
+      hasFeishuAPI,
+      ttObject: typeof window.tt,
+      requestAccess: typeof window.tt?.requestAccess,
+      requestAuthCode: typeof window.tt?.requestAuthCode,
+      feishuObject: typeof window.feishu,
+      larkObject: typeof window.lark,
+      ttWebViewObject: typeof window.ttWebView
     });
+    
+    // 飞书客户端特殊处理 - 即使没有TT API也尝试
+    if (isFeishuAndroid || isFeishuWindows) {
+      console.log('检测到飞书客户端（安卓或Windows）');
+      return true;
+    }
     
     return isFeishuApp && hasTTAPI && hasJSAPI;
   };
@@ -51,7 +85,7 @@ const getAuthCode = async () => {
   return new Promise((resolve, reject) => {
     const timeout = setTimeout(() => {
       reject(new Error('获取授权码超时'));
-    }, 10000); // 10秒超时
+    }, 15000); // 15秒超时
 
     const clearTimeoutAndResolve = (code) => {
       clearTimeout(timeout);
@@ -63,43 +97,136 @@ const getAuthCode = async () => {
       reject(error);
     };
 
-    // 优先使用 requestAccess（新版API）
-    if (window.tt?.requestAccess) {
-      console.log('使用 requestAccess API');
-      window.tt.requestAccess({
-        appID: 'cli_a8be137e6579500b',
-        scopeList: [],
-        state: 'autoLogin',
-        success: (res) => {
-          console.log('requestAccess 成功:', res);
-          clearTimeoutAndResolve(res.code);
-        },
-        fail: (err) => {
-          console.log('requestAccess 失败:', err);
-          // 如果是权限不足，降级到 requestAuthCode
-          if (err.errno === 103 && window.tt?.requestAuthCode) {
-            console.log('降级到 requestAuthCode API');
-            fallbackToRequestAuthCode(clearTimeoutAndResolve, clearTimeoutAndReject);
-          } else {
+    console.log('开始获取授权码，检查所有可能的API...');
+    console.log('可用API检查:', {
+      tt: typeof window.tt,
+      requestAccess: typeof window.tt?.requestAccess,
+      requestAuthCode: typeof window.tt?.requestAuthCode,
+      feishu: typeof window.feishu,
+      lark: typeof window.lark,
+      ttWebView: typeof window.ttWebView
+    });
+
+    // 尝试多种API获取授权码
+    const tryGetAuthCode = () => {
+      // 1. 优先使用 requestAccess（新版API）
+      if (window.tt?.requestAccess) {
+        console.log('使用 requestAccess API');
+        window.tt.requestAccess({
+          appID: 'cli_a8be137e6579500b',
+          scopeList: [],
+          state: 'autoLogin',
+          success: (res) => {
+            console.log('requestAccess 成功:', res);
+            clearTimeoutAndResolve(res.code);
+          },
+          fail: (err) => {
+            console.log('requestAccess 失败:', err);
+            // 如果是权限不足，降级到 requestAuthCode
+            if (err.errno === 103 && window.tt?.requestAuthCode) {
+              console.log('降级到 requestAuthCode API');
+              fallbackToRequestAuthCode(clearTimeoutAndResolve, clearTimeoutAndReject);
+            } else {
+              clearTimeoutAndReject(err);
+            }
+          }
+        });
+      } 
+      // 2. 降级使用 requestAuthCode（旧版API）
+      else if (window.tt?.requestAuthCode) {
+        console.log('使用 requestAuthCode API');
+        fallbackToRequestAuthCode(clearTimeoutAndResolve, clearTimeoutAndReject);
+      }
+      // 3. 尝试其他可能的API
+      else if (window.feishu?.requestAuthCode) {
+        console.log('使用 feishu.requestAuthCode API');
+        window.feishu.requestAuthCode({
+          appId: 'cli_a8be137e6579500b',
+          success: (res) => {
+            console.log('feishu.requestAuthCode 成功:', res);
+            clearTimeoutAndResolve(res.code);
+          },
+          fail: (err) => {
+            console.log('feishu.requestAuthCode 失败:', err);
             clearTimeoutAndReject(err);
           }
-        }
-      });
-    } 
-    // 降级使用 requestAuthCode（旧版API）
-    else if (window.tt?.requestAuthCode) {
-      console.log('使用 requestAuthCode API');
-      fallbackToRequestAuthCode(clearTimeoutAndResolve, clearTimeoutAndReject);
-    } 
-    // 都不支持
-    else {
-      clearTimeoutAndReject(new Error('飞书JSAPI不可用'));
-    }
+        });
+      }
+      // 4. 尝试 lark API
+      else if (window.lark?.requestAuthCode) {
+        console.log('使用 lark.requestAuthCode API');
+        window.lark.requestAuthCode({
+          appId: 'cli_a8be137e6579500b',
+          success: (res) => {
+            console.log('lark.requestAuthCode 成功:', res);
+            clearTimeoutAndResolve(res.code);
+          },
+          fail: (err) => {
+            console.log('lark.requestAuthCode 失败:', err);
+            clearTimeoutAndReject(err);
+          }
+        });
+      }
+      // 5. 尝试通过URL参数获取（备用方案）
+      else {
+        console.log('所有JSAPI都不可用，尝试备用方案...');
+        tryAlternativeMethod(clearTimeoutAndResolve, clearTimeoutAndReject);
+      }
+    };
+
+    // 延迟执行，确保飞书API已加载
+    setTimeout(tryGetAuthCode, 1000);
   });
+};
+
+// 备用方案：尝试通过其他方式获取授权码
+const tryAlternativeMethod = (resolve, reject) => {
+  console.log('尝试备用方案...');
+  
+  // 检查URL中是否有code参数
+  const urlParams = new URLSearchParams(window.location.search);
+  const code = urlParams.get('code');
+  
+  if (code) {
+    console.log('从URL参数中获取到code:', code);
+    resolve(code);
+    return;
+  }
+  
+  // 尝试通过postMessage与飞书客户端通信
+  try {
+    console.log('尝试通过postMessage获取授权码...');
+    window.postMessage({
+      type: 'requestAuthCode',
+      appId: 'cli_a8be137e6579500b'
+    }, '*');
+    
+    // 监听响应
+    const messageHandler = (event) => {
+      if (event.data && event.data.type === 'authCodeResponse') {
+        console.log('通过postMessage获取到授权码:', event.data.code);
+        window.removeEventListener('message', messageHandler);
+        resolve(event.data.code);
+      }
+    };
+    
+    window.addEventListener('message', messageHandler);
+    
+    // 5秒后超时
+    setTimeout(() => {
+      window.removeEventListener('message', messageHandler);
+      reject(new Error('postMessage获取授权码超时'));
+    }, 5000);
+    
+  } catch (error) {
+    console.error('postMessage方案失败:', error);
+    reject(new Error('所有获取授权码的方法都失败了'));
+  }
 };
 
 // 降级到 requestAuthCode
 const fallbackToRequestAuthCode = (resolve, reject) => {
+  console.log('调用 requestAuthCode...');
   window.tt.requestAuthCode({
     appId: 'cli_a8be137e6579500b',
     success: (res) => {
@@ -151,17 +278,60 @@ const callBackendAuth = async (code) => {
 // 导出检测函数供外部使用
 export const checkFeishuEnvironment = () => {
   const ua = navigator.userAgent;
-  const isFeishuApp = /Lark|Feishu/.test(ua);
+  const isFeishuApp = /Lark|Feishu|feishu|lark/i.test(ua);
   const hasTTAPI = typeof window.tt !== 'undefined';
   const hasRequestAccess = typeof window.tt?.requestAccess !== 'undefined';
   const hasRequestAuthCode = typeof window.tt?.requestAuthCode !== 'undefined';
+  
+  // 安卓特定检测
+  const isAndroid = /Android/i.test(ua);
+  const isFeishuAndroid = isAndroid && (isFeishuApp || /feishu|lark/i.test(ua));
+  
+  // Windows特定检测
+  const isWindows = /Windows/i.test(ua);
+  const isFeishuWindows = isWindows && (isFeishuApp || /feishu|lark/i.test(ua));
+  
+  // 检查其他可能的飞书API
+  const hasFeishuAPI = typeof window.feishu !== 'undefined' || 
+                       typeof window.lark !== 'undefined' ||
+                       typeof window.ttWebView !== 'undefined';
+  
+  // 检查Electron环境
+  const isElectron = /Electron/i.test(ua);
+  
+  // 飞书客户端特殊处理
+  const canAutoLogin = (isFeishuAndroid || isFeishuWindows) ? true : 
+                      (isFeishuApp && hasTTAPI && (hasRequestAccess || hasRequestAuthCode));
   
   return {
     isFeishuApp,
     hasTTAPI,
     hasRequestAccess,
     hasRequestAuthCode,
-    canAutoLogin: isFeishuApp && hasTTAPI && (hasRequestAccess || hasRequestAuthCode),
-    userAgent: ua
+    isAndroid,
+    isFeishuAndroid,
+    isWindows,
+    isFeishuWindows,
+    isElectron,
+    hasFeishuAPI,
+    canAutoLogin,
+    userAgent: ua,
+    ttObject: typeof window.tt,
+    feishuObject: typeof window.feishu,
+    larkObject: typeof window.lark,
+    ttWebViewObject: typeof window.ttWebView,
+    detailedInfo: {
+      userAgent: ua,
+      isFeishuApp, 
+      hasTTAPI, 
+      hasRequestAccess,
+      hasRequestAuthCode,
+      isAndroid,
+      isFeishuAndroid,
+      isWindows,
+      isFeishuWindows,
+      isElectron,
+      hasFeishuAPI
+    }
   };
 };
