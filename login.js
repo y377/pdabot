@@ -68,9 +68,9 @@ const FEISHU_CONFIG = {
   
   const showUserAvatar = (avatarUrl, userName) => {
     setTimeout(() => {
-      const h1 = document.querySelector('h1');
-      if (!h1) return;
-      const img = h1.querySelector('img');
+      const h5 = document.querySelector('h5');
+      if (!h5) return;
+      const img = h5.querySelector('img');
       if (!img) return;
       img.src = avatarUrl;
       if (userName) {
