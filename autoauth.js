@@ -7,6 +7,7 @@ export const feishuAutoLogin = async () => {
     const hasTTAPI = typeof window.tt !== 'undefined';
     const hasJSAPI = typeof window.tt?.requestAccess !== 'undefined' || 
                      typeof window.tt?.requestAuthCode !== 'undefined';
+    const hasH5SDK = typeof window.h5sdk !== 'undefined';
     
     // 安卓特定检测
     const isAndroid = /Android/i.test(ua);
@@ -29,6 +30,7 @@ export const feishuAutoLogin = async () => {
       isFeishuApp, 
       hasTTAPI, 
       hasJSAPI,
+      hasH5SDK,
       isAndroid,
       isFeishuAndroid,
       isWindows,
@@ -38,6 +40,7 @@ export const feishuAutoLogin = async () => {
       ttObject: typeof window.tt,
       requestAccess: typeof window.tt?.requestAccess,
       requestAuthCode: typeof window.tt?.requestAuthCode,
+      h5sdkObject: typeof window.h5sdk,
       feishuObject: typeof window.feishu,
       larkObject: typeof window.lark,
       ttWebViewObject: typeof window.ttWebView
@@ -61,7 +64,14 @@ export const feishuAutoLogin = async () => {
   try {
     console.log('开始飞书客户端免密登录...');
     
-    // 获取授权码
+    // 1. 先进行H5SDK鉴权
+    const authSuccess = await performH5SDKAuth();
+    if (!authSuccess) {
+      console.log('H5SDK鉴权失败，跳过免密登录');
+      return false;
+    }
+    
+    // 2. 获取授权码
     const code = await getAuthCode();
     console.log('获取到授权码:', code ? '成功' : '失败');
     
@@ -69,7 +79,7 @@ export const feishuAutoLogin = async () => {
       throw new Error('无法获取授权码');
     }
 
-    // 调用后端免密登录接口
+    // 3. 调用后端免密登录接口
     const userData = await callBackendAuth(code);
     console.log('后端认证成功:', userData ? '是' : '否');
     
@@ -77,6 +87,103 @@ export const feishuAutoLogin = async () => {
   } catch (error) {
     console.error('飞书免密登录失败:', error);
     return false;
+  }
+};
+
+// H5SDK鉴权
+const performH5SDKAuth = async () => {
+  return new Promise(async (resolve) => {
+    if (!window.h5sdk) {
+      console.log('H5SDK不可用，跳过鉴权');
+      resolve(false);
+      return;
+    }
+
+    console.log('开始H5SDK鉴权...');
+    
+    try {
+      // 1. 从后端获取签名信息
+      const signatureInfo = await getSignatureFromBackend();
+      if (!signatureInfo) {
+        console.log('无法获取签名信息，跳过鉴权');
+        resolve(false);
+        return;
+      }
+
+      // 2. 通过error接口处理API验证失败后的回调
+      window.h5sdk.error((err) => {
+        console.error('H5SDK鉴权失败:', err);
+        resolve(false);
+      });
+
+      // 3. 调用config接口进行鉴权
+      window.h5sdk.config({
+        appId: signatureInfo.appId,
+        timestamp: signatureInfo.timestamp,
+        nonceStr: signatureInfo.nonceStr,
+        signature: signatureInfo.signature,
+        jsApiList: ['requestAccess', 'requestAuthCode'], // 声明需要使用的API
+        //鉴权成功回调
+        onSuccess: (res) => {
+          console.log('H5SDK鉴权成功:', res);
+          resolve(true);
+        },
+        //鉴权失败回调
+        onFail: (err) => {
+          console.error('H5SDK鉴权失败:', err);
+          // 鉴权失败时，尝试直接调用API（某些情况下可能仍然有效）
+          console.log('尝试直接调用API...');
+          resolve(true);
+        },
+      });
+
+      // 4. 完成鉴权后，便可在 window.h5sdk.ready 里调用 JSAPI
+      window.h5sdk.ready(() => {
+        console.log('H5SDK ready，可以调用JSAPI');
+        resolve(true);
+      });
+    } catch (error) {
+      console.error('H5SDK鉴权过程出错:', error);
+      resolve(false);
+    }
+  });
+};
+
+// 从后端获取签名信息
+const getSignatureFromBackend = async () => {
+  try {
+    console.log('从后端获取签名信息...');
+    
+    // 获取当前页面URL（去除hash部分）
+    const url = location.href.split('#')[0];
+    
+    const response = await fetch('https://pdabot.jsjs.net/auth/signature', {
+      method: 'POST',
+      headers: { 
+        'Content-Type': 'application/json',
+        'X-Client-Type': 'feishu-app'
+      },
+      body: JSON.stringify({ 
+        url,
+        appId: 'cli_a8be137e6579500b'
+      })
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+    }
+
+    const data = await response.json();
+    console.log('签名信息响应:', data);
+
+    if (data.code === 0 && data.data) {
+      return data.data;
+    } else {
+      throw new Error(data.msg || '获取签名信息失败');
+    }
+  } catch (error) {
+    console.error('获取签名信息失败:', error);
+    return null;
   }
 };
 
