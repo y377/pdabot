@@ -254,7 +254,8 @@ const FEISHU_CONFIG = {
         return;
       }
       
-      // 3. 尝试飞书客户端免密登录
+      // 3. 尝试飞书客户端免密登录（在显示扫码登录之前）
+      console.log('开始尝试免密登录...');
       const autoLoginSuccess = await handleAutoLogin();
       if (autoLoginSuccess) {
         console.log('免密登录成功，进入主界面');
@@ -263,16 +264,23 @@ const FEISHU_CONFIG = {
         return;
       }
       
-      // 4. 回退到扫码登录
-      console.log('需要扫码登录');
+      // 4. 免密登录失败，回退到扫码登录
+      console.log('免密登录失败，回退到扫码登录');
       showLoginUI();
       initQRLogin();
       
     } catch (error) {
       console.error('登录流程失败:', error);
-      showToast(`登录失败: ${error.message}`, 'danger');
-      showLoginUI();
-      initQRLogin();
+      // 只有在非免密登录相关的错误时才显示扫码登录
+      if (!error.message.includes('免密登录')) {
+        showToast(`登录失败: ${error.message}`, 'danger');
+        showLoginUI();
+        initQRLogin();
+      } else {
+        console.log('免密登录相关错误，尝试扫码登录');
+        showLoginUI();
+        initQRLogin();
+      }
     }
   };
   
