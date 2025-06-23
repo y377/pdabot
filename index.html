@@ -32,7 +32,7 @@
     <!-- 主界面（默认隐藏） -->
     <div id="mainUI" class="container d-none">
         <h5 class="my-3 text-center"><i class="bi bi-upc-scan px-2"></i>PDA扫码助手<img src="" class="rounded-5 float-end" data-bs-toggle="tooltip" style="width: 2.5rem;"></h1>
-        <div id="toastContainer" class="position-fixed top-50 start-50 translate-middle" style="z-index: 9999;"></div>
+        <div id="toastContainer" class="position-fixed top-0 start-50 translate-middle" style="z-index: 9999;"></div>
         
         <!-- 表单添加验证功能 -->
         <form id="pdaForm" class="needs-validation" novalidate>
@@ -51,7 +51,7 @@
                 <div class="col text-end">
                     <label class="form-label fw-bold" for="type">配件类型：</label>
                     <select id="type" class="form-select" required>
-                        <option value="" selected>请选择</option>
+                        <option value="" selected disabled>请选择</option>
                         <option value="CPU">CPU</option>
                         <option value="内存">内存</option>
                         <option value="硬盘">硬盘</option>
@@ -94,7 +94,7 @@
                 <div class="col">
                     <label class="form-label text-danger fw-bold" for="newBrand">新件品牌：</label>
                     <select id="newBrand" class="form-select">
-                        <option value="" selected>请选择</option>
+                        <option value="" selected disabled>请选择</option>
                     </select>
                     <div class="invalid-feedback">
                         请选择新件品牌
@@ -103,7 +103,7 @@
                 <div class="col text-end">
                     <label class="form-label text-dark fw-bold" for="oldBrand">旧件品牌：</label>
                     <select id="oldBrand" class="form-select">
-                        <option value="" selected>请选择</option>
+                        <option value="" selected disabled>请选择</option>
                     </select>
                     <div class="invalid-feedback">
                         请选择旧件品牌
@@ -151,7 +151,7 @@
             <div class="form-group my-3">
                 <label class="form-label fw-bold" for="chatSelect">发送到群：</label>
                 <select id="chatSelect" class="form-select" required>
-                    <option value="" selected>请选择群</option>
+                    <option value="" selected disabled>请选择群</option>
                 </select>
                 <div class="invalid-feedback">
                     请选择发送到群
