@@ -9,7 +9,112 @@ const FEISHU_CONFIG = {
   };
   let currentUser = null;
   
-  // 2. 主流程相关函数（initQRLogin、loadChatList放最上面）
+  // 2. 工具函数
+  const showToast = (message, type = 'danger') => {
+    const toastContainer = document.getElementById('toastContainer');
+    if (toastContainer) {
+      const toast = document.createElement('div');
+      toast.className = `toast text-bg-${type} border-0`;
+      toast.setAttribute('role', 'alert');
+      toast.setAttribute('aria-live', 'assertive');
+      toast.setAttribute('aria-atomic', 'true');
+      
+      const toastBody = document.createElement('div');
+      toastBody.className = 'toast-body';
+      toastBody.textContent = message;
+      toast.appendChild(toastBody);
+  
+      toastContainer.appendChild(toast);
+      const bsToast = new bootstrap.Toast(toast, {
+        animation: true,
+        autohide: true,
+        delay: 5000
+      });
+      bsToast.show();
+      toast.addEventListener('hidden.bs.toast', () => toast.remove());
+    }
+  };
+  
+  const saveUserInfo = (userData) => {
+    if (!userData) return;
+    localStorage.setItem('isLoggedIn', 'true');
+    localStorage.setItem('userId', userData.user_id || userData.open_id);
+    localStorage.setItem('userName', userData.name);
+    localStorage.setItem('userAvatar', userData.avatar_url);
+    localStorage.setItem('feishu_token', JSON.stringify({
+      access_token: userData.access_token,
+      refresh_token: userData.refresh_token,
+      tokenInfo: userData.tokenInfo
+    }));
+    currentUser = {
+      id: userData.user_id || userData.open_id,
+      name: userData.name
+    };
+  };
+  
+  const clearUserInfo = () => {
+    localStorage.removeItem('feishu_token');
+    localStorage.removeItem('isLoggedIn');
+    localStorage.removeItem('userId');
+    localStorage.removeItem('userName');
+    localStorage.removeItem('userAvatar');
+    currentUser = null;
+  };
+  
+  const isTokenValid = () => {
+    const tokenInfo = JSON.parse(localStorage.getItem('feishu_token') || '{}');
+    return !!tokenInfo.access_token;
+  };
+  
+  const showUserAvatar = (avatarUrl, userName) => {
+    setTimeout(() => {
+      const h1 = document.querySelector('h1');
+      if (!h1) return;
+      const img = h1.querySelector('img');
+      if (!img) return;
+      img.src = avatarUrl;
+      if (userName) {
+        img.setAttribute('data-bs-title', userName);
+      }
+      // 初始化所有tooltip
+      const tooltipTriggerList = document.querySelectorAll('[data-bs-toggle="tooltip"]');
+      [...tooltipTriggerList].forEach(el => {
+        if (!el._tooltip_inited) {
+          new bootstrap.Tooltip(el);
+          el._tooltip_inited = true;
+        }
+      });
+    }, 100);
+  };
+  
+  // 3. UI 控制函数
+  const showMainUI = () => {
+    document.getElementById('loginUI').style.display = 'none';
+    document.getElementById('mainUI').classList.remove('d-none');
+    const avatarUrl = localStorage.getItem('userAvatar');
+    const userName = localStorage.getItem('userName');
+    showUserAvatar(avatarUrl, userName);
+  
+    // 登录成功后再加载配件数据（只加载一次）
+    if (!window.partsData) {
+      fetch('https://pn.jsjs.net/pn', { cache: 'force-cache' })
+        .then(res => res.json())
+        .then(data => {
+          window.partsData = data;
+          window.partsDataReady = true;
+          window.dispatchEvent(new Event('partsDataLoaded'));
+        })
+        .catch(err => {
+          console.error('加载配件数据失败:', err);
+        });
+    }
+  };
+  
+  const showLoginUI = () => {
+    document.getElementById('loginUI').style.display = 'block';
+    document.getElementById('mainUI').classList.add('d-none');
+  };
+  
   const initQRLogin = () => {
     const state = 'scan'; // 固定为 scan，用于标识扫码登录
     const goto = `https://passport.feishu.cn/suite/passport/oauth/authorize?` +
@@ -32,6 +137,7 @@ const FEISHU_CONFIG = {
     window.addEventListener('message', handleMessage, false);
   };
   
+  // 4. 数据加载函数
   const loadChatList = async () => {
     const userId = localStorage.getItem('userId');
     if (!userId) {
@@ -70,49 +176,7 @@ const FEISHU_CONFIG = {
     }
   };
   
-  // 2. 主流程函数
-  const loginInit = async () => {
-    const urlParams = new URLSearchParams(window.location.search);
-    const code = urlParams.get('code');
-    const state = urlParams.get('state');
-  
-    if (code) {
-      handleLoginCallback({ code, type: state === 'scan' ? 'scan' : 'feishu' })
-        .then(() => {
-          showMainUI();
-          loadChatList();
-          window.history.replaceState({}, document.title, window.location.pathname);
-          window.location.reload();
-        })
-        .catch(() => {
-          showLoginUI();
-          initQRLogin();
-        });
-    } else {
-      // 1. 优先尝试飞书客户端内的免密登录
-      //    feishuAutoLogin 只在飞书客户端内有效，浏览器环境会直接返回 false
-      const userData = await feishuAutoLogin();
-      if (userData) {
-        // 2. 免密登录成功，保存用户信息到 localStorage
-        localStorage.setItem('isLoggedIn', 'true');
-        localStorage.setItem('userId', userData.open_id || userData.user_id);
-        localStorage.setItem('userName', userData.name);
-        if (userData.avatar_url) localStorage.setItem('userAvatar', userData.avatar_url);
-        // 3. 切换到主界面并加载群列表
-        showMainUI();
-        loadChatList();
-      } else if (isTokenValid()) {
-        // 4. 如果本地已有有效 token，直接进入主界面
-        showMainUI();
-        loadChatList();
-      } else {
-        // 5. 否则回退到扫码登录界面
-        showLoginUI();
-        initQRLogin();
-      }
-    }
-  };
-  
+  // 5. 登录处理函数
   const handleLoginCallback = async ({ code, type }) => {
     try {
       console.log('开始处理登录回调:', { code, type });
@@ -148,159 +212,79 @@ const FEISHU_CONFIG = {
     }
   };
   
-  const checkLogin = () => {
+  const handleAutoLogin = async () => {
     try {
+      console.log('尝试飞书客户端免密登录...');
+      const userData = await feishuAutoLogin();
+      if (userData) {
+        console.log('免密登录成功:', userData);
+        saveUserInfo(userData);
+        return true;
+      }
+      return false;
+    } catch (error) {
+      console.error('免密登录失败:', error);
+      return false;
+    }
+  };
+  
+  // 6. 主登录流程
+  const processLogin = async () => {
+    try {
+      // 1. 检查URL参数（登录回调）
       const urlParams = new URLSearchParams(window.location.search);
       const code = urlParams.get('code');
       const state = urlParams.get('state');
       
-      console.log('检查登录状态:', { code, state });
-      
       if (code) {
-        // 有 code 参数，说明是飞书登录回调
-        console.log('检测到登录回调，code:', code, 'state:', state);
-        handleLoginCallback({ code, type: state === 'scan' ? 'scan' : 'feishu' })
-          .then(() => {
-            console.log('登录成功，显示主界面');
-            showMainUI();
-            loadChatList();
-            // 清除URL参数
-            window.history.replaceState({}, document.title, window.location.pathname);
-          })
-          .catch((error) => {
-            console.error('登录失败:', error);
-            showLoginUI();
-            // 显示错误提示
-            const toastContainer = document.getElementById('toastContainer');
-            if (toastContainer) {
-              const toast = document.createElement('div');
-              toast.className = 'toast text-bg-danger border-0';
-              toast.setAttribute('role', 'alert');
-              toast.setAttribute('aria-live', 'assertive');
-              toast.setAttribute('aria-atomic', 'true');
-              // 安全地添加内容
-              const toastBody = document.createElement('div');
-              toastBody.className = 'toast-body';
-              toastBody.textContent = `登录失败: ${error.message}`;
-              toast.appendChild(toastBody);
-  
-              toastContainer.appendChild(toast);
-              const bsToast = new bootstrap.Toast(toast, {
-                animation: true,
-                autohide: true,
-                delay: 5000
-              });
-              bsToast.show();
-              toast.addEventListener('hidden.bs.toast', () => toast.remove());
-            }
-            initQRLogin();
-          });
-      } else {
-        // 检查登录状态
-        if (isTokenValid()) {
-          console.log('Token有效，显示主界面');
-          showMainUI();
-          loadChatList();
-        } else {
-          console.log('Token无效，显示登录界面');
-          showLoginUI();
-          initQRLogin();
-        }
+        console.log('检测到登录回调，处理中...');
+        await handleLoginCallback({ code, type: state === 'scan' ? 'scan' : 'feishu' });
+        showMainUI();
+        loadChatList();
+        // 清除URL参数
+        window.history.replaceState({}, document.title, window.location.pathname);
+        return;
       }
+      
+      // 2. 检查本地token
+      if (isTokenValid()) {
+        console.log('本地token有效，直接进入主界面');
+        showMainUI();
+        loadChatList();
+        return;
+      }
+      
+      // 3. 尝试飞书客户端免密登录
+      const autoLoginSuccess = await handleAutoLogin();
+      if (autoLoginSuccess) {
+        console.log('免密登录成功，进入主界面');
+        showMainUI();
+        loadChatList();
+        return;
+      }
+      
+      // 4. 回退到扫码登录
+      console.log('需要扫码登录');
+      showLoginUI();
+      initQRLogin();
+      
     } catch (error) {
-      console.error('检查登录状态失败:', error);
+      console.error('登录流程失败:', error);
+      showToast(`登录失败: ${error.message}`, 'danger');
       showLoginUI();
       initQRLogin();
     }
   };
   
-  const showMainUI = () => {
-    document.getElementById('loginUI').style.display = 'none';
-    document.getElementById('mainUI').classList.remove('d-none');
-    const avatarUrl = localStorage.getItem('userAvatar');
-    const userName = localStorage.getItem('userName');
-    showUserAvatar(avatarUrl, userName);
+  // 7. 兼容性函数（保持向后兼容）
+  const loginInit = processLogin;
   
-    // 登录成功后再加载配件数据（只加载一次）
-    if (!window.partsData) {
-      fetch('https://pn.jsjs.net/pn', { cache: 'force-cache' })
-        .then(res => res.json())
-        .then(data => {
-          window.partsData = data;
-          window.partsDataReady = true;
-          window.dispatchEvent(new Event('partsDataLoaded'));
-        })
-        .catch(err => {
-          console.error('加载配件数据失败:', err);
-        });
-    }
-  };
+  const checkLogin = processLogin;
   
-  const showLoginUI = () => {
-    document.getElementById('loginUI').style.display = 'block';
-    document.getElementById('mainUI').classList.add('d-none');
-    // 不再调用 showUserAvatar();
-  };
+  // 8. 事件绑定
+  document.addEventListener('DOMContentLoaded', processLogin);
   
-  // 3. 辅助函数
-  const saveUserInfo = (userData) => {
-    if (!userData) return;
-    localStorage.setItem('isLoggedIn', 'true');
-    localStorage.setItem('userId', userData.user_id);
-    localStorage.setItem('userName', userData.name);
-    localStorage.setItem('userAvatar', userData.avatar_url);
-    localStorage.setItem('feishu_token', JSON.stringify({
-      access_token: userData.access_token,
-      refresh_token: userData.refresh_token,
-      tokenInfo: userData.tokenInfo
-    }));
-    currentUser = {
-      id: userData.user_id,
-      name: userData.name
-    };
-  };
-  
-  const clearUserInfo = () => {
-    localStorage.removeItem('feishu_token');
-    localStorage.removeItem('isLoggedIn');
-    localStorage.removeItem('userId');
-    localStorage.removeItem('userName');
-    localStorage.removeItem('userAvatar');
-    currentUser = null;
-  };
-  
-  const isTokenValid = () => {
-    const tokenInfo = JSON.parse(localStorage.getItem('feishu_token') || '{}');
-    return !!tokenInfo.access_token;
-  };
-  
-  const showUserAvatar = (avatarUrl, userName) => {
-    setTimeout(() => {
-      const h1 = document.querySelector('h1');
-      if (!h1) return;
-      const img = h1.querySelector('img');
-      if (!img) return;
-      img.src = avatarUrl;
-      if (userName) {
-        img.setAttribute('data-bs-title', userName);
-      }
-      // 初始化所有tooltip
-      const tooltipTriggerList = document.querySelectorAll('[data-bs-toggle="tooltip"]');
-      [...tooltipTriggerList].forEach(el => {
-        if (!el._tooltip_inited) {
-          new bootstrap.Tooltip(el);
-          el._tooltip_inited = true;
-        }
-      });
-      // console.log('showUserAvatar set', img.src, userName);
-    }, 100);
-  };
-  
-  // 4. 事件绑定
-  
-  document.addEventListener('DOMContentLoaded', loginInit);
-  
-  // 5. 导出
+  // 9. 导出
   window.loginUtils = {
     isTokenValid,
     showMainUI,
@@ -310,5 +294,7 @@ const FEISHU_CONFIG = {
     handleLoginCallback,
     checkLogin,
     loadChatList,
-    currentUser
+    currentUser,
+    processLogin,
+    loginInit
   }; 
