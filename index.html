@@ -1,325 +1,133 @@
 <!DOCTYPE html>
-<html lang="zh-CN">
+<html lang="zh">
+
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>飞书免密登录测试</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <meta charset="UTF-8" />
+    <title>PDA扫码助手</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <link rel="icon" href="/favicon.png" type="image/png">
+    <!-- <link rel="manifest" href="/manifest.json"> -->
+    <meta name="theme-color" content="#6c757d">
+    <link crossorigin="anonymous" href="https://lib.baomitu.com/twitter-bootstrap/5.3.3/css/bootstrap.min.css" rel="stylesheet" />
+    <link crossorigin="anonymous" href="https://lib.baomitu.com/bootstrap-icons/1.11.3/font/bootstrap-icons.min.css" rel="stylesheet" />
+    <link crossorigin="anonymous" href="https://lib.baomitu.com/highlight.js/11.10.0/styles/github-dark.css" rel="stylesheet" />
+    <link crossorigin="anonymous" href="/icons/icon-144x144.png" rel="apple-touch-icon" />
+    <!-- 飞书SDK -->
     <script type="text/javascript" src="https://lf-scm-cn.feishucdn.com/lark/op/h5-js-sdk-1.5.42.js"></script>
-    <style>
-        .test-section {
-            margin: 20px 0;
-            padding: 20px;
-            border: 1px solid #dee2e6;
-            border-radius: 8px;
-        }
-        .log-area {
-            background: #f8f9fa;
-            border: 1px solid #dee2e6;
-            border-radius: 4px;
-            padding: 10px;
-            height: 300px;
-            overflow-y: auto;
-            font-family: monospace;
-            font-size: 12px;
-        }
-        .status-indicator {
-            display: inline-block;
-            width: 12px;
-            height: 12px;
-            border-radius: 50%;
-            margin-right: 8px;
-        }
-        .status-success { background-color: #28a745; }
-        .status-error { background-color: #dc3545; }
-        .status-warning { background-color: #ffc107; }
-        .status-info { background-color: #17a2b8; }
-        .debug-info {
-            background: #e9ecef;
-            padding: 10px;
-            border-radius: 4px;
-            font-size: 11px;
-            margin: 5px 0;
-        }
-        .api-info {
-            background: #d4edda;
-            border: 1px solid #c3e6cb;
-            border-radius: 4px;
-            padding: 15px;
-            margin: 10px 0;
-        }
-    </style>
+    <script src="https://lf-package-cn.feishucdn.com/obj/feishu-static/lark/passport/qrcode/LarkSSOSDKWebQRCode-1.0.3.js"></script>
 </head>
+
 <body>
-    <div class="container mt-4">
-        <h1>飞书免密登录测试</h1>
-        
-        <!-- API使用说明 -->
-        <div class="test-section">
-            <h3>API使用说明</h3>
-            <div class="api-info">
-                <h5>requestAccess API 参数说明：</h5>
-                <ul>
-                    <li><strong>appID</strong>：应用ID（必须传）</li>
-                    <li><strong>scopeList</strong>：权限列表（空数组表示仅获取用户凭证信息权限）</li>
-                    <li><strong>state</strong>：状态参数（用于维护请求和回调状态）</li>
-                </ul>
-                <p><strong>注意：</strong>空数组的 scopeList 表示仅授予应用获取用户凭证信息权限，无需用户额外授权。</p>
+    <!-- 登录界面 -->
+    <div id="loginUI" class="text-center py-5">
+        <div class="card mx-auto" style="max-width: 35rem;">
+            <div class="card-header"><i class="bi bi-upc-scan px-2"></i>PDA扫码助手</div>
+            <div class="card-body">
+                <div id="login_container"></div>
+                <p class="card-text">请使用飞书扫码登录</p>
             </div>
         </div>
-        
-        <!-- 环境检测 -->
-        <div class="test-section">
-            <h3>环境检测</h3>
-            <div id="environmentInfo"></div>
-        </div>
-        
-        <!-- 详细调试信息 -->
-        <div class="test-section">
-            <h3>详细调试信息</h3>
-            <button id="showDebugInfo" class="btn btn-info">显示详细调试信息</button>
-            <div id="debugInfo" class="mt-3" style="display: none;"></div>
-        </div>
-        
-        <!-- 免密登录测试 -->
-        <div class="test-section">
-            <h3>免密登录测试</h3>
-            <button id="testAutoLogin" class="btn btn-primary">测试免密登录</button>
-            <div id="autoLoginResult" class="mt-3"></div>
-        </div>
-        
-        <!-- 登录状态 -->
-        <div class="test-section">
-            <h3>登录状态</h3>
-            <div id="loginStatus"></div>
-            <button id="clearLogin" class="btn btn-warning mt-2">清除登录状态</button>
-        </div>
-        
-        <!-- 日志区域 -->
-        <div class="test-section">
-            <h3>调试日志</h3>
-            <div id="logArea" class="log-area"></div>
-            <button id="clearLog" class="btn btn-secondary mt-2">清除日志</button>
-        </div>
     </div>
-
-    <script type="module">
-        import { feishuAutoLogin, checkFeishuEnvironment } from './autoauth.js';
-        
-        // 日志函数
-        const log = (message, type = 'info') => {
-            const logArea = document.getElementById('logArea');
-            const timestamp = new Date().toLocaleTimeString();
-            const logEntry = document.createElement('div');
-            logEntry.innerHTML = `<span class="status-${type}"></span>[${timestamp}] ${message}`;
-            logArea.appendChild(logEntry);
-            logArea.scrollTop = logArea.scrollHeight;
-            console.log(`[${type.toUpperCase()}] ${message}`);
-        };
-        
-        // 清除日志
-        document.getElementById('clearLog').addEventListener('click', () => {
-            document.getElementById('logArea').innerHTML = '';
-        });
-        
-        // 环境检测
-        const checkEnvironment = () => {
-            const env = checkFeishuEnvironment();
-            const envInfo = document.getElementById('environmentInfo');
-            
-            const statusClass = env.canAutoLogin ? 'status-success' : 'status-warning';
-            const statusText = env.canAutoLogin ? '支持免密登录' : '不支持免密登录';
-            
-            envInfo.innerHTML = `
-                <div class="row">
-                    <div class="col-md-6">
-                        <p><span class="status-indicator ${statusClass}"></span>${statusText}</p>
-                        <ul class="list-unstyled">
-                            <li>飞书应用: <span class="badge ${env.isFeishuApp ? 'bg-success' : 'bg-secondary'}">${env.isFeishuApp ? '是' : '否'}</span></li>
-                            <li>TT API: <span class="badge ${env.hasTTAPI ? 'bg-success' : 'bg-secondary'}">${env.hasTTAPI ? '是' : '否'}</span></li>
-                            <li>requestAccess: <span class="badge ${env.hasRequestAccess ? 'bg-success' : 'bg-secondary'}">${env.hasRequestAccess ? '是' : '否'}</span></li>
-                            <li>requestAuthCode: <span class="badge ${env.hasRequestAuthCode ? 'bg-success' : 'bg-secondary'}">${env.hasRequestAuthCode ? '是' : '否'}</span></li>
-                            <li>其他飞书API: <span class="badge ${env.hasFeishuAPI ? 'bg-success' : 'bg-secondary'}">${env.hasFeishuAPI ? '是' : '否'}</span></li>
-                            <li>安卓设备: <span class="badge ${env.isAndroid ? 'bg-info' : 'bg-secondary'}">${env.isAndroid ? '是' : '否'}</span></li>
-                            <li>安卓飞书: <span class="badge ${env.isFeishuAndroid ? 'bg-info' : 'bg-secondary'}">${env.isFeishuAndroid ? '是' : '否'}</span></li>
-                            <li>Windows设备: <span class="badge ${env.isWindows ? 'bg-info' : 'bg-secondary'}">${env.isWindows ? '是' : '否'}</span></li>
-                            <li>Windows飞书: <span class="badge ${env.isFeishuWindows ? 'bg-info' : 'bg-secondary'}">${env.isFeishuWindows ? '是' : '否'}</span></li>
-                            <li>Electron环境: <span class="badge ${env.isElectron ? 'bg-info' : 'bg-secondary'}">${env.isElectron ? '是' : '否'}</span></li>
-                        </ul>
-                    </div>
-                    <div class="col-md-6">
-                        <p><strong>User Agent:</strong></p>
-                        <small class="text-muted">${env.userAgent}</small>
-                    </div>
-                </div>
-            `;
-            
-            // 保存环境信息供调试使用
-            window.debugEnv = env;
-            
-            log(`环境检测完成: ${statusText}`, env.canAutoLogin ? 'success' : 'warning');
-        };
-        
-        // 显示详细调试信息
-        const showDebugInfo = () => {
-            const debugDiv = document.getElementById('debugInfo');
-            const env = window.debugEnv;
-            
-            if (!env) {
-                debugDiv.innerHTML = '<div class="alert alert-warning">请先进行环境检测</div>';
-                return;
-            }
-            
-            debugDiv.innerHTML = `
-                <div class="debug-info">
-                    <h5>详细环境信息:</h5>
-                    <pre>${JSON.stringify(env.detailedInfo, null, 2)}</pre>
-                </div>
-                <div class="debug-info">
-                    <h5>全局对象检查:</h5>
-                    <p><strong>window.tt:</strong> ${typeof window.tt}</p>
-                    <p><strong>window.feishu:</strong> ${typeof window.feishu}</p>
-                    <p><strong>window.lark:</strong> ${typeof window.lark}</p>
-                    <p><strong>window.ttWebView:</strong> ${typeof window.ttWebView}</p>
-                </div>
-                <div class="debug-info">
-                    <h5>API方法检查:</h5>
-                    <p><strong>window.tt?.requestAccess:</strong> ${typeof window.tt?.requestAccess}</p>
-                    <p><strong>window.tt?.requestAuthCode:</strong> ${typeof window.tt?.requestAuthCode}</p>
-                    <p><strong>window.feishu?.requestAuthCode:</strong> ${typeof window.feishu?.requestAuthCode}</p>
-                    <p><strong>window.lark?.requestAuthCode:</strong> ${typeof window.lark?.requestAuthCode}</p>
-                </div>
-                <div class="debug-info">
-                    <h5>设备信息:</h5>
-                    <p><strong>平台:</strong> ${navigator.platform}</p>
-                    <p><strong>语言:</strong> ${navigator.language}</p>
-                    <p><strong>屏幕尺寸:</strong> ${screen.width}x${screen.height}</p>
-                    <p><strong>视口尺寸:</strong> ${window.innerWidth}x${window.innerHeight}</p>
-                </div>
-                <div class="debug-info">
-                    <h5>URL参数检查:</h5>
-                    <p><strong>当前URL:</strong> ${window.location.href}</p>
-                    <p><strong>code参数:</strong> ${new URLSearchParams(window.location.search).get('code') || '无'}</p>
-                    <p><strong>state参数:</strong> ${new URLSearchParams(window.location.search).get('state') || '无'}</p>
-                </div>
-            `;
-            
-            debugDiv.style.display = 'block';
-        };
-        
-        // 测试免密登录
-        const testAutoLogin = async () => {
-            const resultDiv = document.getElementById('autoLoginResult');
-            const button = document.getElementById('testAutoLogin');
-            
-            button.disabled = true;
-            button.textContent = '测试中...';
-            resultDiv.innerHTML = '<div class="alert alert-info">正在测试免密登录...</div>';
-            
-            try {
-                log('开始测试免密登录...', 'info');
-                const userData = await feishuAutoLogin();
-                
-                if (userData) {
-                    resultDiv.innerHTML = `
-                        <div class="alert alert-success">
-                            <h5>免密登录成功！</h5>
-                            <p><strong>用户名:</strong> ${userData.name}</p>
-                            <p><strong>用户ID:</strong> ${userData.user_id || userData.open_id}</p>
-                            <p><strong>头像:</strong> ${userData.avatar_url ? '有' : '无'}</p>
-                        </div>
-                    `;
-                    log('免密登录成功', 'success');
-                    updateLoginStatus();
-                } else {
-                    resultDiv.innerHTML = `
-                        <div class="alert alert-warning">
-                            <h5>免密登录失败</h5>
-                            <p>可能的原因：</p>
-                            <ul>
-                                <li>不在飞书客户端内</li>
-                                <li>飞书API不可用</li>
-                                <li>用户未授权</li>
-                                <li>网络问题</li>
-                                <li>后端服务异常</li>
-                            </ul>
-                            <p><strong>建议:</strong> 点击"显示详细调试信息"查看具体问题</p>
-                        </div>
-                    `;
-                    log('免密登录失败', 'warning');
-                }
-            } catch (error) {
-                resultDiv.innerHTML = `
-                    <div class="alert alert-danger">
-                        <h5>免密登录异常</h5>
-                        <p><strong>错误信息:</strong> ${error.message}</p>
-                        <p><strong>建议:</strong> 点击"显示详细调试信息"查看具体问题</p>
-                    </div>
-                `;
-                log(`免密登录异常: ${error.message}`, 'error');
-            } finally {
-                button.disabled = false;
-                button.textContent = '测试免密登录';
-            }
-        };
-        
-        // 更新登录状态
-        const updateLoginStatus = () => {
-            const statusDiv = document.getElementById('loginStatus');
-            const tokenInfo = JSON.parse(localStorage.getItem('feishu_token') || '{}');
-            const isLoggedIn = localStorage.getItem('isLoggedIn') === 'true';
-            const userName = localStorage.getItem('userName');
-            const userId = localStorage.getItem('userId');
-            
-            if (isLoggedIn && tokenInfo.access_token) {
-                statusDiv.innerHTML = `
-                    <div class="alert alert-success">
-                        <h5><span class="status-indicator status-success"></span>已登录</h5>
-                        <p><strong>用户名:</strong> ${userName || '未知'}</p>
-                        <p><strong>用户ID:</strong> ${userId || '未知'}</p>
-                        <p><strong>Token:</strong> ${tokenInfo.access_token ? '有效' : '无效'}</p>
-                    </div>
-                `;
-            } else {
-                statusDiv.innerHTML = `
-                    <div class="alert alert-secondary">
-                        <h5><span class="status-indicator status-warning"></span>未登录</h5>
-                        <p>请先进行登录操作</p>
-                    </div>
-                `;
-            }
-        };
-        
-        // 清除登录状态
-        const clearLogin = () => {
-            localStorage.removeItem('feishu_token');
-            localStorage.removeItem('isLoggedIn');
-            localStorage.removeItem('userId');
-            localStorage.removeItem('userName');
-            localStorage.removeItem('userAvatar');
-            updateLoginStatus();
-            log('登录状态已清除', 'info');
-        };
-        
-        // 事件绑定
-        document.getElementById('testAutoLogin').addEventListener('click', testAutoLogin);
-        document.getElementById('clearLogin').addEventListener('click', clearLogin);
-        document.getElementById('showDebugInfo').addEventListener('click', showDebugInfo);
-        
-        // 初始化
-        document.addEventListener('DOMContentLoaded', () => {
-            log('测试页面初始化完成', 'info');
-            checkEnvironment();
-            updateLoginStatus();
-        });
-        
-        // 监听登录状态变化
-        window.addEventListener('storage', (e) => {
-            if (e.key === 'feishu_token' || e.key === 'isLoggedIn') {
-                updateLoginStatus();
-                log('登录状态发生变化', 'info');
-            }
-        });
-    </script>
+    <!-- 主界面（默认隐藏） -->
+    <div id="mainUI" class="container d-none">
+        <h1 class="my-3 text-center font-monospace"><i class="bi bi-upc-scan px-2"></i>PDA扫码助手<img src="" class="rounded-5 float-end" data-bs-toggle="tooltip" style="width: 2.5rem;"></h1>
+        <div id="toastContainer" class="position-fixed top-50 start-50 translate-middle" style="z-index: 9999;"></div>
+        <div class="row mb-3">
+            <div class="col">
+                <label class="form-label fw-bold" for="orderNo">单号：<span id="orderNoDisplay" class="text-primary font-monospace"></span></label>
+                <input id="orderNo" type="text" class="form-control" placeholder="请粘贴单号">
+            </div>
+            <div class="col text-end">
+                <label class="form-label fw-bold" for="type">配件类型：</label>
+                <select id="type" class="form-select">
+                    <option selected>请选择</option>
+                    <option value="CPU">CPU</option>
+                    <option value="内存">内存</option>
+                    <option value="硬盘">硬盘</option>
+                    <option value="光模块">光模块</option>
+                    <option value="AOC线缆">AOC线缆</option>
+                    <option value="主板">主板</option>
+                    <option value="电源">电源</option>
+                    <option value="网卡">网卡</option>
+                    <option value="交换机">交换机</option>
+                </select>
+            </div>
+        </div>
+        <div id="switchInfoRow" class="row my-3 d-none">
+            <div class="col-8 pe-1">
+                <label class="form-label" for="switchLocation">交换机位置：</label>
+                <input id="switchLocation" type="text" class="form-control" placeholder="">
+            </div>
+            <div class="col-4 ps-1 text-end">
+                <label class="form-label" for="portNo">端口：</label>
+                <input id="portNo" type="text" class="form-control" placeholder="">
+            </div>
+        </div>
+        <div id="serverSNRow" class="my-3">
+            <label class="form-label font-monospace" for="serverSN"><i class="bi bi-server px-1"></i>服务器SN：</label>
+            <input id="serverSN" type="text" class="form-control" placeholder="请扫码">
+        </div>
+        <div id="brandSection" class="row my-3 d-none">
+            <div class="col">
+                <label class="form-label text-danger fw-bold" for="newBrand">新件品牌：</label>
+                <select id="newBrand" class="form-select">
+                    <option selected>请选择</option>
+                </select>
+            </div>
+            <div class="col text-end">
+                <label class="form-label text-dark fw-bold" for="oldBrand">旧件品牌：</label>
+                <select id="oldBrand" class="form-select">
+                    <option selected>请选择</option>
+                </select>
+            </div>
+        </div>
+        <div class="form-group my-3">
+            <label class="form-label d-flex justify-content-between" for="newSN">
+                <span class="text-danger fw-bold">新件SN：</span><small id="countNewSN" class="text-muted">字符数：0</small>
+            </label>
+            <input id="newSN" type="text" class="form-control" placeholder="">
+        </div>
+        <div class="form-group my-3">
+            <label class="form-label d-flex justify-content-between" for="newPN">
+                <span class="text-danger fw-bold">新件PN：</span><span id="checkNewPN" class="text-success"></span><small id="countNewPN" class="text-muted">字符数：0</small>
+            </label>
+            <input id="newPN" list="newPnOptions" type="text" class="form-control" placeholder="" autocorrect="off">
+            <datalist id="newPnOptions"></datalist>
+        </div>
+        <div class="form-group my-3">
+            <label class="form-label d-flex justify-content-between" for="oldSN">
+                <span class="text-dark fw-bold">旧件SN：</span><small id="countOldSN" class="text-muted">字符数：0</small>
+            </label>
+            <input id="oldSN" type="text" class="form-control" placeholder="">
+        </div>
+        <div class="form-group my-3">
+            <label class="form-label d-flex justify-content-between" for="oldPN">
+                <span class="text-dark fw-bold">旧件PN：</span><span id="checkOldPN" class="text-success"></span><small id="countOldPN" class="text-muted">字符数：0</small>
+            </label>
+            <input id="oldPN" list="oldPnOptions" type="text" class="form-control" placeholder="" autocorrect="off">
+            <datalist id="oldPnOptions"></datalist>
+        </div>
+        <div class="form-group my-3">
+            <label class="form-label fw-bold" for="chatSelect">发送到群：</label>
+            <select id="chatSelect" class="form-select">
+                <option selected>请选择群</option>
+            </select>
+        </div>
+        <div class="d-flex justify-content-between align-items-center my-4 pt-3">
+            <button id="resetBtn" class="btn btn-outline-warning" onclick="resetForm()"><i class="bi bi-arrow-counterclockwise pe-1"></i>清空</button>
+            <button id="copyBtn" class="btn btn-outline-danger"><i class="bi bi-copy pe-1"></i>复制</button>
+            <button class="btn btn-outline-success" onclick="sendApplyNotify()"><i class="bi bi-megaphone-fill pe-1"></i>申领通知</button>
+            <button class="btn btn-outline-primary" onclick="sendToFeishu()"><i class="bi bi-send pe-1"></i>替换通知</button>
+        </div>
+        <!-- 预览区域（兼容移动端） -->
+        <pre class="rounded"><code id="preview" class="language-plaintext"></code></pre>
+    </div>
+    <!-- 脚本放在底部 -->
+    <script crossorigin="anonymous" src="https://lib.baomitu.com/twitter-bootstrap/5.3.3/js/bootstrap.bundle.min.js"></script>
+    <script crossorigin="anonymous" src="https://lib.baomitu.com/highlight.js/11.10.0/highlight.min.js"></script>
+    <script type="module" src="login.js"></script>
+    <script src="pda.js"></script>
 </body>
-</html> 
+
+</html>
