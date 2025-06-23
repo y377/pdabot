@@ -109,12 +109,12 @@ const getAuthCode = async () => {
 
     // 尝试多种API获取授权码
     const tryGetAuthCode = () => {
-      // 1. 优先使用 requestAccess（新版API）
+      // 1. 优先使用 requestAccess（新版API）- 根据官方文档正确使用
       if (window.tt?.requestAccess) {
-        console.log('使用 requestAccess API');
+        console.log('使用 requestAccess API（仅获取用户凭证信息权限）');
         window.tt.requestAccess({
           appID: 'cli_a8be137e6579500b',
-          scopeList: [],
+          scopeList: [], // 空数组表示仅授予应用获取用户凭证信息权限
           state: 'autoLogin',
           success: (res) => {
             console.log('requestAccess 成功:', res);
@@ -167,61 +167,22 @@ const getAuthCode = async () => {
           }
         });
       }
-      // 5. 尝试通过URL参数获取（备用方案）
+      // 5. 都不支持
       else {
-        console.log('所有JSAPI都不可用，尝试备用方案...');
-        tryAlternativeMethod(clearTimeoutAndResolve, clearTimeoutAndReject);
+        console.error('所有飞书JSAPI都不可用');
+        console.error('可用对象:', {
+          tt: window.tt,
+          feishu: window.feishu,
+          lark: window.lark,
+          ttWebView: window.ttWebView
+        });
+        clearTimeoutAndReject(new Error('飞书JSAPI不可用，请检查飞书客户端版本'));
       }
     };
 
     // 延迟执行，确保飞书API已加载
     setTimeout(tryGetAuthCode, 1000);
   });
-};
-
-// 备用方案：尝试通过其他方式获取授权码
-const tryAlternativeMethod = (resolve, reject) => {
-  console.log('尝试备用方案...');
-  
-  // 检查URL中是否有code参数
-  const urlParams = new URLSearchParams(window.location.search);
-  const code = urlParams.get('code');
-  
-  if (code) {
-    console.log('从URL参数中获取到code:', code);
-    resolve(code);
-    return;
-  }
-  
-  // 尝试通过postMessage与飞书客户端通信
-  try {
-    console.log('尝试通过postMessage获取授权码...');
-    window.postMessage({
-      type: 'requestAuthCode',
-      appId: 'cli_a8be137e6579500b'
-    }, '*');
-    
-    // 监听响应
-    const messageHandler = (event) => {
-      if (event.data && event.data.type === 'authCodeResponse') {
-        console.log('通过postMessage获取到授权码:', event.data.code);
-        window.removeEventListener('message', messageHandler);
-        resolve(event.data.code);
-      }
-    };
-    
-    window.addEventListener('message', messageHandler);
-    
-    // 5秒后超时
-    setTimeout(() => {
-      window.removeEventListener('message', messageHandler);
-      reject(new Error('postMessage获取授权码超时'));
-    }, 5000);
-    
-  } catch (error) {
-    console.error('postMessage方案失败:', error);
-    reject(new Error('所有获取授权码的方法都失败了'));
-  }
 };
 
 // 降级到 requestAuthCode
