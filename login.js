@@ -97,7 +97,7 @@ const FEISHU_CONFIG = {
   
     // 登录成功后再加载配件数据（只加载一次）
     if (!window.partsData) {
-      fetch('https://pn.jsjs.net/pn', { cache: 'force-cache' })
+      fetch('https://pn.scdn.vip:25625/pn.json')
         .then(res => res.json())
         .then(data => {
           window.partsData = data;
@@ -158,15 +158,11 @@ const FEISHU_CONFIG = {
       if (data.code === 0 && data.data && data.data.items) {
         const chatSelect = document.getElementById('chatSelect');
         if (chatSelect) {
-          // 只保留第一个默认选项
-          chatSelect.length = 1;
-          // 动态添加群选项
-          data.data.items.forEach(chat => {
-            const option = document.createElement('option');
-            option.value = chat.chat_id;
-            option.textContent = chat.name;
-            chatSelect.appendChild(option);
-          });
+          // 使用 innerHTML 方式一次性替换，兼容 pda.js 的风格
+          chatSelect.innerHTML = '<option value="">请选择要发送的群</option>' + 
+            data.data.items.map(chat => 
+              `<option value="${chat.chat_id}">${chat.name}</option>`
+            ).join('');
         }
       } else {
         console.warn('群列表数据格式错误');
