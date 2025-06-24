@@ -545,53 +545,106 @@ const bindEvents = () => {
 
 // PN输入框切换管理器 - 重构版本
 const PNInputManager = {
-  // 创建或获取select元素
+  // 创建或获取select元素 - 增强安全性
   getOrCreateSelect: (targetId, parentElement, inputElement) => {
+    // 首先尝试从DOM缓存获取
     let select = DOM.get(targetId);
-    if (!select) {
-      select = document.createElement("select");
-      select.id = targetId;
-      select.className = inputElement.className;
-      select.addEventListener("change", update);
-      parentElement.appendChild(select);
+    
+    if (!select && parentElement && inputElement) {
+      try {
+        console.log(`创建select元素: ${targetId}`);
+        select = document.createElement("select");
+        select.id = targetId;
+        select.className = inputElement.className;
+        select.addEventListener("change", update);
+        parentElement.appendChild(select);
+        
+        // 更新DOM缓存
+        if (DOM.cache && typeof DOM.cache.set === 'function') {
+          DOM.cache.set(targetId, select);
+        }
+        
+        console.log(`成功创建select元素: ${targetId}`);
+      } catch (error) {
+        console.error(`创建select元素失败: ${targetId}`, error);
+        return null;
+      }
     }
+    
     return select;
   },
 
-  // 切换显示状态
+  // 切换显示状态 - 修复null检查
   toggleDisplay: (selectElement, inputElement, showSelect) => {
-    if (showSelect) {
+    if (showSelect && selectElement) {
       selectElement.style.display = "";
-      inputElement.style.display = "none";
+      if (inputElement) inputElement.style.display = "none";
     } else {
       if (selectElement) selectElement.style.display = "none";
-      inputElement.style.display = "";
+      if (inputElement) inputElement.style.display = "";
     }
   },
 
-  // 处理单个PN输入框
+  // 处理单个PN输入框 - 增强安全检查
   handlePNInput: (type, isNewField, brand) => {
     const prefix = isNewField ? 'new' : 'old';
     const inputElement = isNewField ? newPN : oldPN;
-    const parentElement = inputElement.parentElement;
-    const selectId = `${prefix}PNSelect`;
     
-    const needsSelect = ['硬盘', 'CPU'].includes(type);
-    
-    if (needsSelect) {
-      const select = PNInputManager.getOrCreateSelect(selectId, parentElement, inputElement);
-      OptionsRenderer.renderOptions(type, brand, select, true);
+    // 安全检查：确保输入元素存在
+    if (!inputElement) {
+      console.warn(`输入元素 ${prefix}PN 不存在`);
+      return;
     }
     
-    const select = DOM.get(selectId);
-    PNInputManager.toggleDisplay(select, inputElement, needsSelect);
+    const parentElement = inputElement.parentElement;
+    if (!parentElement) {
+      console.warn(`父元素不存在: ${prefix}PN`);
+      return;
+    }
+    
+    const selectId = `${prefix}PNSelect`;
+    const needsSelect = ['硬盘', 'CPU'].includes(type);
+    
+    let selectElement = null;
+    
+    if (needsSelect) {
+      selectElement = PNInputManager.getOrCreateSelect(selectId, parentElement, inputElement);
+      if (selectElement) {
+        OptionsRenderer.renderOptions(type, brand, selectElement, true);
+      }
+    } else {
+      selectElement = DOM.get(selectId);
+    }
+    
+    // 安全切换显示状态
+    PNInputManager.toggleDisplay(selectElement, inputElement, needsSelect);
   }
 };
 
-// 简化的切换函数
+// 简化的切换函数 - 增强错误处理
 const switchPnInput = (type) => {
-  PNInputManager.handlePNInput(type, true, newBrand.value);  // 新件
-  PNInputManager.handlePNInput(type, false, oldBrand.value); // 旧件
+  try {
+    console.log(`切换PN输入框类型: ${type}`);
+    
+    if (!type || type === '请选择') {
+      console.warn('配件类型无效，跳过PN输入框切换');
+      return;
+    }
+    
+    // 确保品牌元素存在再获取值
+    const newBrandValue = newBrand?.value || '';
+    const oldBrandValue = oldBrand?.value || '';
+    
+    console.log(`品牌值: 新件=${newBrandValue}, 旧件=${oldBrandValue}`);
+    
+    PNInputManager.handlePNInput(type, true, newBrandValue);   // 新件
+    PNInputManager.handlePNInput(type, false, oldBrandValue);  // 旧件
+    
+    console.log('PN输入框切换完成');
+  } catch (error) {
+    console.error('PN输入框切换失败:', error);
+    showToast('配件类型切换失败，请刷新页面重试', 'warning');
+  }
 };
 
 // 监听硬盘PN select 的变化
@@ -1082,8 +1135,25 @@ Object.assign(window, {
   }
 });
 
+// 调试工具函数
+const debugDOMState = () => {
+  console.log('=== DOM状态检查 ===');
+  console.log('orderNo:', orderNo);
+  console.log('typeSelect:', typeSelect);
+  console.log('newBrand:', newBrand);
+  console.log('oldBrand:', oldBrand);
+  console.log('newPN:', newPN);
+  console.log('oldPN:', oldPN);
+  console.log('newSN:', newSN);
+  console.log('oldSN:', oldSN);
+  console.log('=== 检查完成 ===');
+};
+
 // 在页面加载完成后初始化表单验证
 document.addEventListener('DOMContentLoaded', () => {
   // 延迟初始化，确保其他脚本已经加载完成
-  setTimeout(initFormValidation, 1000);
+  setTimeout(() => {
+    debugDOMState(); // 调试DOM状态
+    initFormValidation();
+  }, 1000);
 });
