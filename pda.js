@@ -202,8 +202,17 @@ const updateBrandOptions = () => {
   });
 
   section.classList.remove("d-none");
-  updatePnOptions(type, newBrand.value, newPnOptions);
-  updatePnOptions(type, oldBrand.value, oldPnOptions);
+  
+  // 只有在品牌不是"请选择"时才更新PN选项
+  if (newBrand.value !== "请选择") {
+    updatePnOptions(type, newBrand.value, newPnOptions);
+  }
+  if (oldBrand.value !== "请选择") {
+    updatePnOptions(type, oldBrand.value, oldPnOptions);
+  }
+  
+  // 切换PN输入框类型
+  switchPnInput(type);
 };
 
 const waitForData = () => {
@@ -353,12 +362,22 @@ const OptionsRenderer = {
     }
   },
 
+  // 获取默认提示文本
+  getDefaultText: (type) => {
+    return OptionsRenderer.config[type]?.defaultText || '请选择';
+  },
+
   // 统一渲染方法
   renderOptions: (type, brand, targetElement, isSelect = false) => {
-    if (!window.partsData || !OptionsRenderer.config[type]) return;
+    if (!window.partsData || !OptionsRenderer.config[type]) {
+      console.warn(`数据源未就绪: partsData=${!!window.partsData}, config=${!!OptionsRenderer.config[type]}`);
+      return;
+    }
     
     const config = OptionsRenderer.config[type];
-    const list = window.partsData[config.dataSource].filter(item => item.brand === brand);
+    const list = window.partsData[config.dataSource]?.filter(item => item.brand === brand) || [];
+    
+    console.log(`渲染选项: type=${type}, brand=${brand}, 找到${list.length}个选项`);
     
     if (isSelect) {
       const optionsData = [
@@ -524,16 +543,19 @@ const bindEvents = () => {
     [newBrand, oldBrand].forEach((select, index) => {
       select.addEventListener("change", () => {
         const type = typeSelect.value;
+        const brand = select.value;
         const datalist = index === 0 ? newPnOptions : oldPnOptions;
-        updatePnOptions(type, select.value, datalist);
         
-        if (type === "硬盘") {
-          const selectId = `${index === 0 ? 'new' : 'old'}PNSelect`;
-          const pnSelect = DOM.get(selectId);
-          if (pnSelect) {
-            OptionsRenderer.renderOptions('硬盘', select.value, pnSelect, true);
-          }
+        console.log(`品牌选择变化: ${type}, 品牌: ${brand}`);
+        
+        // 首先切换PN输入框类型（创建select元素）
+        if (['硬盘', 'CPU'].includes(type) && brand !== "请选择") {
+          PNInputManager.handlePNInput(type, index === 0, brand);
         }
+        
+        // 然后更新PN选项
+        updatePnOptions(type, brand, datalist);
+        
         update();
       });
     });
@@ -753,9 +775,10 @@ const update = () => {
     }
   }
 
-  // 优化：只要新旧PN都已选择且不为"请选择硬盘PN"时就校验一致性 - 添加安全检查
+  // 优化：只要新旧PN都已选择且不为默认提示文本时就校验一致性 - 添加安全检查
   if ((type === "内存" || type === "硬盘") && checkNewPN && checkOldPN) {
-    if (pn1 && pn2 && pn1 !== "" && pn2 !== "" && pn1 !== "请选择硬盘PN" && pn2 !== "请选择硬盘PN") {
+    const defaultText = OptionsRenderer.getDefaultText(type);
+    if (pn1 && pn2 && pn1 !== "" && pn2 !== "" && pn1 !== defaultText && pn2 !== defaultText) {
       if (pn1 === pn2) {
         checkNewPN.textContent = "PN一致";
         checkOldPN.textContent = "PN一致";
@@ -901,7 +924,8 @@ const sendApplyNotify = () => {
     }
     return oldPN.value.trim();
   })();
-  if (!brand2 || brand2 === '请选择' || !sn2 || !pn2 || pn2 === '请选择硬盘PN') {
+  const defaultText = OptionsRenderer.getDefaultText(typeSelect.value);
+  if (!brand2 || brand2 === '请选择' || !sn2 || !pn2 || pn2 === defaultText) {
     showToast('旧件品牌、旧件SN、旧件PN均为必填项', 'warning');
     return;
   }
@@ -968,7 +992,9 @@ const FormDataManager = {
       ['pda_oldPN', FormDataManager.getPNValue("old")]
     ];
 
-    const invalidValues = ["", "请选择", "请选择硬盘PN"];
+    const type = typeSelect?.value || "";
+    const defaultText = OptionsRenderer.getDefaultText(type);
+    const invalidValues = ["", "请选择", defaultText];
     
     fieldMappings.forEach(([key, value]) => {
       if (value && !invalidValues.includes(value)) {
