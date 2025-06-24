@@ -815,7 +815,13 @@ function markdownTableToObject(md) {
 }
 
 // 修改 sendToFeishu，传递对象数据
-function sendToFeishu() {
+function sendToFeishu(event) {
+  // 阻止默认行为
+  if (event) {
+    event.preventDefault();
+    event.stopPropagation();
+  }
+  
   const type = typeSelect.value;
   const orderInput = orderNo.value.trim();
   const chatId = document.getElementById('chatSelect').value;
@@ -905,7 +911,13 @@ function sendToFeishu() {
 }
 
 // 修改 sendApplyNotify 函数
-function sendApplyNotify() {
+function sendApplyNotify(event) {
+  // 阻止默认行为
+  if (event) {
+    event.preventDefault();
+    event.stopPropagation();
+  }
+  
   const orderInput = orderNo.value.trim();
   const urlMatch = orderInput.match(/https?:\/\/[\S]+/);
   if (!urlMatch) {
@@ -1040,7 +1052,13 @@ document.addEventListener("change", function (e) {
 });
 
 // 重置按钮
-function resetForm() {
+function resetForm(event) {
+  // 阻止默认行为
+  if (event) {
+    event.preventDefault();
+    event.stopPropagation();
+  }
+  
   if (confirm("确定要重置所有数据吗？")) {
     ["pda_orderNo", "pda_type", "pda_switchLocation", "pda_portNo", "pda_serverSN", "pda_newBrand", "pda_oldBrand", "pda_newPN", "pda_oldPN", "pda_newSN", "pda_oldSN"].forEach((key) =>
       localStorage.removeItem(key)
