@@ -9,6 +9,20 @@
     <link rel="icon" href="/favicon.png" type="image/png">
     <!-- <link rel="manifest" href="/manifest.json"> -->
     <meta name="theme-color" content="#6c757d">
+    
+    <!-- DNS预解析和预连接优化 -->
+    <link rel="dns-prefetch" href="//pn.jsjs.net">
+    <link rel="dns-prefetch" href="//pdabot.jsjs.net">
+    <link rel="dns-prefetch" href="//lf-scm-cn.feishucdn.com">
+    <link rel="dns-prefetch" href="//lf-package-cn.feishucdn.com">
+    <link rel="dns-prefetch" href="//lib.baomitu.com">
+    <link rel="dns-prefetch" href="//cdn.staticfile.net">
+    
+    <link rel="preconnect" href="https://pn.jsjs.net" crossorigin>
+    <link rel="preconnect" href="https://pdabot.jsjs.net" crossorigin>
+    <link rel="preconnect" href="https://lf-scm-cn.feishucdn.com" crossorigin>
+    <link rel="preconnect" href="https://lib.baomitu.com" crossorigin>
+    
     <link crossorigin="anonymous" href="https://lib.baomitu.com/twitter-bootstrap/5.3.3/css/bootstrap.min.css" rel="stylesheet" />
     <link crossorigin="anonymous" href="https://lib.baomitu.com/bootstrap-icons/1.11.3/font/bootstrap-icons.min.css" rel="stylesheet" />
     <link crossorigin="anonymous" href="https://lib.baomitu.com/highlight.js/11.10.0/styles/github-dark.css" rel="stylesheet" />
@@ -31,7 +45,7 @@
     </div>
     <!-- 主界面（默认隐藏） -->
     <div id="mainUI" class="container d-none">
-        <h5 class="my-3 text-center"><i class="bi bi-upc-scan px-2"></i>PDA扫码助手<img src="" class="rounded-5 float-end" data-bs-toggle="tooltip" style="width: 2.3rem;"></h5>
+        <h5 class="my-3 text-center"><i class="bi bi-upc-scan px-2"></i>PDA扫码助手<img src="" class="rounded-5 float-end" data-bs-toggle="tooltip" style="width: 2.5rem;"></h5>
         <div id="toastContainer" class="position-fixed top-50 start-50 translate-middle" style="z-index: 9999;"></div>
         
         <!-- 表单添加验证功能 -->
