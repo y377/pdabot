@@ -289,30 +289,15 @@ async function handleFeishuAuthCallback(code) {
 
     if (result.code === 0 && result.data) {
       // 保存用户信息和token
-      localStorage.setItem('isLoggedIn', 'true');
-      localStorage.setItem('userId', result.data.user_id);
-      localStorage.setItem('userName', result.data.name);
-      localStorage.setItem('accessToken', result.data.access_token);
       localStorage.setItem('userInfo', JSON.stringify(result.data));
-      
-      // 设置当前用户
-      currentUser = { id: result.data.user_id, name: result.data.name };
-      
-      // 显示主界面
-      showMainUI(result.data.name);
-      loadChatList();
-      
+      localStorage.setItem('access_token', result.data.access_token);
       return true;
     } else {
       console.error('登录失败:', result.msg);
-      showToast(`登录失败: ${result.msg || '未知错误'}`, 'danger');
-      showLoginUI();
       return false;
     }
   } catch (error) {
     console.error('登录请求失败:', error);
-    showToast('登录失败', 'danger');
-    showLoginUI();
     return false;
   }
 }
@@ -815,13 +800,7 @@ function markdownTableToObject(md) {
 }
 
 // 修改 sendToFeishu，传递对象数据
-function sendToFeishu(event) {
-  // 阻止默认行为
-  if (event) {
-    event.preventDefault();
-    event.stopPropagation();
-  }
-  
+function sendToFeishu() {
   const type = typeSelect.value;
   const orderInput = orderNo.value.trim();
   const chatId = document.getElementById('chatSelect').value;
@@ -832,28 +811,20 @@ function sendToFeishu(event) {
   // 检查是否为完整url
   const urlMatch = orderInput.match(/https?:\/\/[\S]+/);
   if (!urlMatch) {
-    // 如果不是URL，检查是否为纯数字
-    const numMatch = orderInput.match(/^\d+$/);
-    if (!numMatch) {
-      showToast("请粘贴完整的单号链接或输入单号数字", "warning");
-      return;
-    }
-    // 如果是纯数字，构建默认URL格式
-    const orderUrl = `https://workflow.example.com/order/${orderInput}`;
-    const orderNum = orderInput;
-  } else {
-    const orderUrl = urlMatch[0];
-    const orderNum = orderUrl.match(/(\d+)(?!.*\d)/)?.[0] || "";
-    if (!orderNum) {
-      showToast("链接中未找到单号数字", "warning");
-      return;
-    }
+    showToast("请粘贴完整的单号链接", "warning");
+    return;
+  }
+  const orderUrl = urlMatch[0];
+  const orderNum = orderUrl.match(/(\d+)(?!.*\d)/)?.[0] || "";
+  if (!orderNum) {
+    showToast("链接中未找到单号数字", "warning");
+    return;
   }
   // 取表单内容，变量名与卡片模板一致，全部转为字符串
   const user_access_token = localStorage.getItem('accessToken') || '';
   const data = {
-    shangxin_xiajiu: type || '',  // 只保留类型名称，不重复"更换"信息
-    danhao: orderUrl,
+    shangxin_xiajiu: `更换「${type || ''}」`,
+    danhao: orderNum + '',
     fuwuqi_sn: (serverSN.value || '').trim(),
     xinpin_pinpai: (newBrand.value || '').trim(),
     xinpin_sn: (newSN.value || '').trim(),
@@ -874,7 +845,7 @@ function sendToFeishu(event) {
       return (oldPN.value || '').trim();
     })(),
     user_name: (currentUser && currentUser.name) ? currentUser.name : '',
-    user_id: (currentUser && currentUser.id) ? currentUser.id : '',
+    user_var: { id: (currentUser && currentUser.id) ? currentUser.id : '' },
     user_access_token: user_access_token
   };
   // 调试输出
@@ -884,8 +855,6 @@ function sendToFeishu(event) {
     chatId: chatId,
     data: data
   }));
-  console.log('当前用户信息:', currentUser);
-  console.log('user_id字段值:', data.user_id);
   fetch("https://pdabot.jsjs.net/api/send-card", {
     method: "POST",
     headers: {
@@ -919,13 +888,7 @@ function sendToFeishu(event) {
 }
 
 // 修改 sendApplyNotify 函数
-function sendApplyNotify(event) {
-  // 阻止默认行为
-  if (event) {
-    event.preventDefault();
-    event.stopPropagation();
-  }
-  
+function sendApplyNotify() {
   const orderInput = orderNo.value.trim();
   const urlMatch = orderInput.match(/https?:\/\/[\S]+/);
   if (!urlMatch) {
@@ -1060,13 +1023,7 @@ document.addEventListener("change", function (e) {
 });
 
 // 重置按钮
-function resetForm(event) {
-  // 阻止默认行为
-  if (event) {
-    event.preventDefault();
-    event.stopPropagation();
-  }
-  
+function resetForm() {
   if (confirm("确定要重置所有数据吗？")) {
     ["pda_orderNo", "pda_type", "pda_switchLocation", "pda_portNo", "pda_serverSN", "pda_newBrand", "pda_oldBrand", "pda_newPN", "pda_oldPN", "pda_newSN", "pda_oldSN"].forEach((key) =>
       localStorage.removeItem(key)
@@ -1131,4 +1088,164 @@ async function loadChatList() {
     console.error('加载群列表失败:', e);
     showToast('群列表加载失败', 'danger');
   }
-} 
+}
+
+// Bootstrap 表单验证功能
+function initFormValidation() {
+  const form = document.getElementById('pdaForm');
+  if (!form) return;
+
+  // 动态验证交换机字段
+  function validateSwitchFields() {
+    const type = typeSelect.value;
+    const switchRow = document.getElementById('switchInfoRow');
+    const switchLocationEl = document.getElementById('switchLocation');
+    const portNoEl = document.getElementById('portNo');
+    
+    if (type === '交换机' && !switchRow.classList.contains('d-none')) {
+      switchLocationEl.setAttribute('required', '');
+      portNoEl.setAttribute('required', '');
+    } else {
+      switchLocationEl.removeAttribute('required');
+      portNoEl.removeAttribute('required');
+      // 清除验证状态
+      switchLocationEl.classList.remove('is-invalid', 'is-valid');
+      portNoEl.classList.remove('is-invalid', 'is-valid');
+    }
+  }
+
+  // 动态验证品牌字段
+  function validateBrandFields() {
+    const type = typeSelect.value;
+    const brandSection = document.getElementById('brandSection');
+    const newBrandEl = document.getElementById('newBrand');
+    const oldBrandEl = document.getElementById('oldBrand');
+    
+    if (['CPU', '内存', '硬盘', '光模块'].includes(type) && !brandSection.classList.contains('d-none')) {
+      newBrandEl.setAttribute('required', '');
+      oldBrandEl.setAttribute('required', '');
+    } else {
+      newBrandEl.removeAttribute('required');
+      oldBrandEl.removeAttribute('required');
+      // 清除验证状态
+      newBrandEl.classList.remove('is-invalid', 'is-valid');
+      oldBrandEl.classList.remove('is-invalid', 'is-valid');
+    }
+  }
+
+  // 监听类型变化以更新验证规则
+  if (typeSelect) {
+    typeSelect.addEventListener('change', () => {
+      validateSwitchFields();
+      validateBrandFields();
+    });
+  }
+
+  // 表单提交事件
+  form.addEventListener('submit', (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+
+    // 更新动态验证规则
+    validateSwitchFields();
+    validateBrandFields();
+
+    // 检查表单有效性
+    if (form.checkValidity()) {
+      // 表单验证通过，执行原来的 sendToFeishu 函数
+      sendToFeishu();
+      showToast('表单验证通过，正在发送...', 'success');
+    } else {
+      // 表单验证失败
+      showToast('请填写所有必填字段', 'danger');
+    }
+
+    // 添加 Bootstrap 验证样式
+    form.classList.add('was-validated');
+  });
+
+  // 实时验证反馈
+  const inputs = form.querySelectorAll('input[required], select[required]');
+  inputs.forEach(input => {
+    input.addEventListener('blur', () => {
+      if (input.checkValidity()) {
+        input.classList.remove('is-invalid');
+        input.classList.add('is-valid');
+      } else {
+        input.classList.remove('is-valid');
+        input.classList.add('is-invalid');
+      }
+    });
+
+    input.addEventListener('input', () => {
+      // 清除之前的验证状态，让用户重新输入时不显示错误
+      if (input.classList.contains('is-invalid') && input.value.trim() !== '') {
+        input.classList.remove('is-invalid');
+        if (input.checkValidity()) {
+          input.classList.add('is-valid');
+        }
+      }
+    });
+  });
+
+  // 特殊处理 select 字段
+  const selects = form.querySelectorAll('select[required]');
+  selects.forEach(select => {
+    select.addEventListener('change', () => {
+      // 检查是否选择了有效选项（不是空值或禁用选项）
+      const selectedOption = select.options[select.selectedIndex];
+      const isValidSelection = select.value && 
+                              select.value !== '' && 
+                              !selectedOption.disabled &&
+                              select.value !== '请选择' && 
+                              select.value !== '请选择群';
+      
+      if (isValidSelection) {
+        select.classList.remove('is-invalid');
+        select.classList.add('is-valid');
+      } else {
+        select.classList.remove('is-valid');
+        select.classList.add('is-invalid');
+      }
+    });
+    
+    // 初始验证状态
+    select.addEventListener('blur', () => {
+      const selectedOption = select.options[select.selectedIndex];
+      const isValidSelection = select.value && 
+                              select.value !== '' && 
+                              !selectedOption.disabled;
+      
+      if (isValidSelection) {
+        select.classList.remove('is-invalid');
+        select.classList.add('is-valid');
+      } else {
+        select.classList.remove('is-valid');
+        select.classList.add('is-invalid');
+      }
+    });
+  });
+
+  console.log('Bootstrap表单验证已初始化');
+}
+
+// 增强重置表单功能，清除验证状态
+const originalResetForm = resetForm;
+resetForm = function() {
+  const form = document.getElementById('pdaForm');
+  if (form) {
+    form.classList.remove('was-validated');
+    // 清除所有验证状态
+    const elements = form.querySelectorAll('.is-valid, .is-invalid');
+    elements.forEach(el => {
+      el.classList.remove('is-valid', 'is-invalid');
+    });
+  }
+  originalResetForm();
+};
+
+// 在页面加载完成后初始化表单验证
+document.addEventListener('DOMContentLoaded', function() {
+  // 延迟初始化，确保其他脚本已经加载完成
+  setTimeout(initFormValidation, 1000);
+}); 
