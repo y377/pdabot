@@ -365,22 +365,28 @@ const OptionsRenderer = {
   renderOptions: (type, brand, targetElement, isSelect = false) => {
     if (!window.partsData || !OptionsRenderer.config[type]) {
       console.warn(`数据源未就绪: partsData=${!!window.partsData}, config=${!!OptionsRenderer.config[type]}`);
-    return;
-  }
-    
+      return;
+    }
     const config = OptionsRenderer.config[type];
     const list = window.partsData[config.dataSource]?.filter(item => item.brand === brand) || [];
-    
-    console.log(`渲染选项: type=${type}, brand=${brand}, 找到${list.length}个选项`);
-    
+    // 只加一个默认项，防止重复
+    let optionsData = [];
     if (isSelect) {
-      const optionsData = [
-        { value: "", text: config.defaultText },
+      optionsData = [
+        { value: '', text: config.defaultText },
         ...list.map(item => ({ value: item.pn, text: config.getOptionText(item) }))
       ];
+      // 去重，只保留第一个默认项
+      optionsData = optionsData.filter((opt, idx, arr) =>
+        opt.value !== '' || arr.findIndex(o => o.value === '') === idx
+      );
       DOMUtils.replaceOptions(targetElement, optionsData);
     } else {
-      const optionsData = ["", ...list.map(item => item.pn)];
+      optionsData = ['', ...list.map(item => item.pn)];
+      // 去重，只保留第一个空字符串
+      optionsData = optionsData.filter((val, idx, arr) =>
+        val !== '' || arr.findIndex(v => v === '') === idx
+      );
       DOMUtils.replaceDatalistOptions(targetElement, optionsData);
     }
   }
