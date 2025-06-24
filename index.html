@@ -31,101 +31,141 @@
     </div>
     <!-- 主界面（默认隐藏） -->
     <div id="mainUI" class="container d-none">
-        <h5 class="my-3 text-center"><i class="bi bi-upc-scan px-2"></i>PDA扫码助手<img src="" class="rounded-5 float-end" data-bs-toggle="tooltip" style="width: 2.5rem;"></h5>
+        <h5 class="my-3 text-center"><i class="bi bi-upc-scan px-2"></i>PDA扫码助手<img src="" class="rounded-5 float-end" data-bs-toggle="tooltip" style="width: 2.3rem;"></h5>
         <div id="toastContainer" class="position-fixed top-50 start-50 translate-middle" style="z-index: 9999;"></div>
-        <div class="row mb-3">
-            <div class="col">
-                <label class="form-label fw-bold" for="orderNo">单号：<span id="orderNoDisplay" class="text-dark-emphasis"></span>
-                    <button id="copyOrderNoBtn" class="btn btn-sm btn-outline-primary border-0" style="display: none;" data-clipboard-text="">
-                        <i class="bi bi-copy"></i>
-                    </button>
+        
+        <!-- 表单添加验证功能 -->
+        <form id="pdaForm" class="needs-validation" novalidate>
+            <div class="row mb-3">
+                <div class="col">
+                    <label class="form-label fw-bold" for="orderNo">单号：<span id="orderNoDisplay" class="text-dark-emphasis"></span>
+                        <button id="copyOrderNoBtn" class="btn btn-sm btn-outline-primary border-0" style="display: none;" data-clipboard-text="">
+                            <i class="bi bi-copy"></i>
+                        </button>
+                    </label>
+                    <input id="orderNo" type="text" class="form-control" placeholder="请粘贴单号" required>
+                    <div class="invalid-feedback">
+                        请输入单号
+                    </div>
+                </div>
+                <div class="col text-end">
+                    <label class="form-label fw-bold" for="type">配件类型：</label>
+                    <select id="type" class="form-select" required>
+                        <option value="" selected disabled>请选择</option>
+                        <option value="CPU">CPU</option>
+                        <option value="内存">内存</option>
+                        <option value="硬盘">硬盘</option>
+                        <option value="光模块">光模块</option>
+                        <option value="AOC线缆">AOC线缆</option>
+                        <option value="主板">主板</option>
+                        <option value="电源">电源</option>
+                        <option value="网卡">网卡</option>
+                        <option value="交换机">交换机</option>
+                    </select>
+                    <div class="invalid-feedback">
+                        请选择配件类型
+                    </div>
+                </div>
+            </div>
+            <div id="switchInfoRow" class="row my-3 d-none">
+                <div class="col-8 pe-1">
+                    <label class="form-label" for="switchLocation">交换机位置：</label>
+                    <input id="switchLocation" type="text" class="form-control" placeholder="">
+                    <div class="invalid-feedback">
+                        请输入交换机位置
+                    </div>
+                </div>
+                <div class="col-4 ps-1 text-end">
+                    <label class="form-label" for="portNo">端口：</label>
+                    <input id="portNo" type="text" class="form-control" placeholder="">
+                    <div class="invalid-feedback">
+                        请输入端口号
+                    </div>
+                </div>
+            </div>
+            <div id="serverSNRow" class="my-3">
+                <label class="form-label font-monospace" for="serverSN"><i class="bi bi-server px-1"></i>服务器SN：</label>
+                <input id="serverSN" type="text" class="form-control" placeholder="请扫码" required>
+                <div class="invalid-feedback">
+                    请输入服务器SN
+                </div>
+            </div>
+            <div id="brandSection" class="row my-3 d-none">
+                <div class="col">
+                    <label class="form-label text-danger fw-bold" for="newBrand">新件品牌：</label>
+                    <select id="newBrand" class="form-select">
+                        <option value="" selected disabled>请选择</option>
+                    </select>
+                    <div class="invalid-feedback">
+                        请选择新件品牌
+                    </div>
+                </div>
+                <div class="col text-end">
+                    <label class="form-label text-dark fw-bold" for="oldBrand">旧件品牌：</label>
+                    <select id="oldBrand" class="form-select">
+                        <option value="" selected disabled>请选择</option>
+                    </select>
+                    <div class="invalid-feedback">
+                        请选择旧件品牌
+                    </div>
+                </div>
+            </div>
+            <div class="form-group my-3">
+                <label class="form-label d-flex justify-content-between" for="newSN">
+                    <span class="text-danger fw-bold">新件SN：</span><small id="countNewSN" class="text-muted">字符数：0</small>
                 </label>
-                <input id="orderNo" type="text" class="form-control" placeholder="请粘贴单号">
+                <input id="newSN" type="text" class="form-control" placeholder="" required>
+                <div class="invalid-feedback">
+                    请输入新件SN
+                </div>
             </div>
-            <div class="col text-end">
-                <label class="form-label fw-bold" for="type">配件类型：</label>
-                <select id="type" class="form-select">
-                    <option selected>请选择</option>
-                    <option value="CPU">CPU</option>
-                    <option value="内存">内存</option>
-                    <option value="硬盘">硬盘</option>
-                    <option value="光模块">光模块</option>
-                    <option value="AOC线缆">AOC线缆</option>
-                    <option value="主板">主板</option>
-                    <option value="电源">电源</option>
-                    <option value="网卡">网卡</option>
-                    <option value="交换机">交换机</option>
+            <div class="form-group my-3">
+                <label class="form-label d-flex justify-content-between" for="newPN">
+                    <span class="text-danger fw-bold">新件PN：</span><span id="checkNewPN" class="text-success"></span><small id="countNewPN" class="text-muted">字符数：0</small>
+                </label>
+                <input id="newPN" list="newPnOptions" type="text" class="form-control" placeholder="" autocorrect="off" required>
+                <datalist id="newPnOptions"></datalist>
+                <div class="invalid-feedback">
+                    请输入新件PN
+                </div>
+            </div>
+            <div class="form-group my-3">
+                <label class="form-label d-flex justify-content-between" for="oldSN">
+                    <span class="text-dark fw-bold">旧件SN：</span><small id="countOldSN" class="text-muted">字符数：0</small>
+                </label>
+                <input id="oldSN" type="text" class="form-control" placeholder="" required>
+                <div class="invalid-feedback">
+                    请输入旧件SN
+                </div>
+            </div>
+            <div class="form-group my-3">
+                <label class="form-label d-flex justify-content-between" for="oldPN">
+                    <span class="text-dark fw-bold">旧件PN：</span><span id="checkOldPN" class="text-success"></span><small id="countOldPN" class="text-muted">字符数：0</small>
+                </label>
+                <input id="oldPN" list="oldPnOptions" type="text" class="form-control" placeholder="" autocorrect="off" required>
+                <datalist id="oldPnOptions"></datalist>
+                <div class="invalid-feedback">
+                    请输入旧件PN
+                </div>
+            </div>
+            <div class="form-group my-3">
+                <label class="form-label fw-bold" for="chatSelect">发送到群：</label>
+                <select id="chatSelect" class="form-select" required>
+                    <option value="" selected disabled>请选择群</option>
                 </select>
+                <div class="invalid-feedback">
+                    请选择发送到群
+                </div>
             </div>
-        </div>
-        <div id="switchInfoRow" class="row my-3 d-none">
-            <div class="col-8 pe-1">
-                <label class="form-label" for="switchLocation">交换机位置：</label>
-                <input id="switchLocation" type="text" class="form-control" placeholder="">
+            <div class="d-flex justify-content-between align-items-center my-4 pt-3">
+                <button id="resetBtn" type="button" class="btn btn-outline-warning" onclick="resetForm()"><i class="bi bi-arrow-counterclockwise pe-1"></i>清空</button>
+                <button id="copyBtn" type="button" class="btn btn-outline-danger" data-clipboard-target="#preview">
+                    <i class="bi bi-copy pe-1"></i>复制
+                </button>
+                <button type="button" class="btn btn-outline-success" onclick="sendApplyNotify()"><i class="bi bi-megaphone-fill pe-1"></i>申领通知</button>
+                <button type="submit" class="btn btn-outline-primary"><i class="bi bi-send pe-1"></i>替换通知</button>
             </div>
-            <div class="col-4 ps-1 text-end">
-                <label class="form-label" for="portNo">端口：</label>
-                <input id="portNo" type="text" class="form-control" placeholder="">
-            </div>
-        </div>
-        <div id="serverSNRow" class="my-3">
-            <label class="form-label font-monospace" for="serverSN"><i class="bi bi-server px-1"></i>服务器SN：</label>
-            <input id="serverSN" type="text" class="form-control" placeholder="请扫码">
-        </div>
-        <div id="brandSection" class="row my-3 d-none">
-            <div class="col">
-                <label class="form-label text-danger fw-bold" for="newBrand">新件品牌：</label>
-                <select id="newBrand" class="form-select">
-                    <option selected>请选择</option>
-                </select>
-            </div>
-            <div class="col text-end">
-                <label class="form-label text-dark fw-bold" for="oldBrand">旧件品牌：</label>
-                <select id="oldBrand" class="form-select">
-                    <option selected>请选择</option>
-                </select>
-            </div>
-        </div>
-        <div class="form-group my-3">
-            <label class="form-label d-flex justify-content-between" for="newSN">
-                <span class="text-danger fw-bold">新件SN：</span><small id="countNewSN" class="text-muted">字符数：0</small>
-            </label>
-            <input id="newSN" type="text" class="form-control" placeholder="">
-        </div>
-        <div class="form-group my-3">
-            <label class="form-label d-flex justify-content-between" for="newPN">
-                <span class="text-danger fw-bold">新件PN：</span><span id="checkNewPN" class="text-success"></span><small id="countNewPN" class="text-muted">字符数：0</small>
-            </label>
-            <input id="newPN" list="newPnOptions" type="text" class="form-control" placeholder="" autocorrect="off">
-            <datalist id="newPnOptions"></datalist>
-        </div>
-        <div class="form-group my-3">
-            <label class="form-label d-flex justify-content-between" for="oldSN">
-                <span class="text-dark fw-bold">旧件SN：</span><small id="countOldSN" class="text-muted">字符数：0</small>
-            </label>
-            <input id="oldSN" type="text" class="form-control" placeholder="">
-        </div>
-        <div class="form-group my-3">
-            <label class="form-label d-flex justify-content-between" for="oldPN">
-                <span class="text-dark fw-bold">旧件PN：</span><span id="checkOldPN" class="text-success"></span><small id="countOldPN" class="text-muted">字符数：0</small>
-            </label>
-            <input id="oldPN" list="oldPnOptions" type="text" class="form-control" placeholder="" autocorrect="off">
-            <datalist id="oldPnOptions"></datalist>
-        </div>
-        <div class="form-group my-3">
-            <label class="form-label fw-bold" for="chatSelect">发送到群：</label>
-            <select id="chatSelect" class="form-select">
-                <option selected>请选择群</option>
-            </select>
-        </div>
-        <div class="d-flex justify-content-between align-items-center my-4 pt-3">
-            <button id="resetBtn" type="button" class="btn btn-outline-warning" onclick="resetForm()"><i class="bi bi-arrow-counterclockwise pe-1"></i>清空</button>
-            <button id="copyBtn" type="button" class="btn btn-outline-danger" data-clipboard-target="#preview">
-                <i class="bi bi-copy pe-1"></i>复制
-            </button>
-            <button type="button" class="btn btn-outline-success" onclick="sendApplyNotify()"><i class="bi bi-megaphone-fill pe-1"></i>申领通知</button>
-            <button type="button" class="btn btn-outline-primary" onclick="sendToFeishu()"><i class="bi bi-send pe-1"></i>替换通知</button>
-        </div>
+        </form>
         <!-- 预览区域（兼容移动端） -->
         <pre class="rounded"><code id="preview" class="language-plaintext"></code></pre>
     </div>
