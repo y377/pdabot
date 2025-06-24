@@ -832,20 +832,28 @@ function sendToFeishu(event) {
   // 检查是否为完整url
   const urlMatch = orderInput.match(/https?:\/\/[\S]+/);
   if (!urlMatch) {
-    showToast("请粘贴完整的单号链接", "warning");
-    return;
-  }
-  const orderUrl = urlMatch[0];
-  const orderNum = orderUrl.match(/(\d+)(?!.*\d)/)?.[0] || "";
-  if (!orderNum) {
-    showToast("链接中未找到单号数字", "warning");
-    return;
+    // 如果不是URL，检查是否为纯数字
+    const numMatch = orderInput.match(/^\d+$/);
+    if (!numMatch) {
+      showToast("请粘贴完整的单号链接或输入单号数字", "warning");
+      return;
+    }
+    // 如果是纯数字，构建默认URL格式
+    const orderUrl = `https://workflow.example.com/order/${orderInput}`;
+    const orderNum = orderInput;
+  } else {
+    const orderUrl = urlMatch[0];
+    const orderNum = orderUrl.match(/(\d+)(?!.*\d)/)?.[0] || "";
+    if (!orderNum) {
+      showToast("链接中未找到单号数字", "warning");
+      return;
+    }
   }
   // 取表单内容，变量名与卡片模板一致，全部转为字符串
   const user_access_token = localStorage.getItem('accessToken') || '';
   const data = {
-    shangxin_xiajiu: `更换「${type || ''}」`,
-    danhao: orderNum + '',
+    shangxin_xiajiu: type || '',  // 只保留类型名称，不重复"更换"信息
+    danhao: orderUrl,
     fuwuqi_sn: (serverSN.value || '').trim(),
     xinpin_pinpai: (newBrand.value || '').trim(),
     xinpin_sn: (newSN.value || '').trim(),
