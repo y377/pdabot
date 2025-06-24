@@ -63,15 +63,17 @@ const EventManager = {
   }
 };
 
-// 单号处理逻辑
-orderNo.addEventListener("input", () => {
-  const val = orderNo.value.trim();
-  const num = val.match(/(\d+)(?!.*\d)/)?.[0] || "";
-  orderNoDisplay.textContent = num ? `${num}` : "";
-  
-  copyOrderNoBtn.style.display = num ? "inline-block" : "none";
-  copyOrderNoBtn.setAttribute("data-clipboard-text", num);
-});
+// 单号处理逻辑 - 添加安全检查
+if (orderNo && orderNoDisplay && copyOrderNoBtn) {
+  orderNo.addEventListener("input", () => {
+    const val = orderNo.value.trim();
+    const num = val.match(/(\d+)(?!.*\d)/)?.[0] || "";
+    orderNoDisplay.textContent = num ? `${num}` : "";
+    
+    copyOrderNoBtn.style.display = num ? "inline-block" : "none";
+    copyOrderNoBtn.setAttribute("data-clipboard-text", num);
+  });
+}
 
 // Clipboard.js 初始化
 document.addEventListener('DOMContentLoaded', () => {
@@ -380,8 +382,15 @@ const mainInit = async () => {
   try {
     await waitForData();
     
-    // 检查必要元素
-    if (!orderNo || !typeSelect) return;
+    // 检查必要元素 - 增强检查
+    const requiredElements = [orderNo, typeSelect, newBrand, oldBrand, newPN, oldPN, newSN, oldSN];
+    const missingElements = requiredElements.filter(el => !el);
+    
+    if (missingElements.length > 0) {
+      console.warn('部分必要DOM元素未找到，延迟初始化');
+      setTimeout(mainInit, 500); // 延迟500ms重试
+      return;
+    }
     
     updateBrandOptions();
     bindEvents();
@@ -391,8 +400,10 @@ const mainInit = async () => {
     if (resetBtn) resetBtn.onclick = resetForm;
     
     checkLogin();
+    console.log('页面初始化完成');
   } catch (error) {
     console.error('页面初始化失败:', error);
+    showToast('页面初始化失败，请刷新页面', 'danger');
   }
 };
 
@@ -620,12 +631,19 @@ const formatSamsungMemoryPn = (pn) => {
 
 const update = () => {
   if (restoring) return;
+  
+  // 安全检查：确保必要的元素存在
+  if (!typeSelect || !orderNo || !newBrand || !oldBrand || !newPN || !oldPN || !newSN || !oldSN) {
+    console.warn('部分DOM元素尚未初始化，跳过更新');
+    return;
+  }
+  
   const type = typeSelect.value;
   const order = orderNo.value.trim().match(/\d+/)?.[0] || "";
   const isOptical = type === "光模块";
-  const switchLoc = switchLocation.value.trim();
-  const port = portNo.value.trim();
-  const server = serverSN.value.trim();
+  const switchLoc = switchLocation ? switchLocation.value.trim() : "";
+  const port = portNo ? portNo.value.trim() : "";
+  const server = serverSN ? serverSN.value.trim() : "";
   const brand1 = newBrand.value || "";
   const brand2 = oldBrand.value || "";
 
@@ -664,14 +682,14 @@ const update = () => {
     }
   }
 
-  // ✅ 字符数统计（必须在格式化之后）
-  countNewPN.textContent = `字符数：${pn1.length}`;
-  countNewSN.textContent = `字符数：${sn1.length}`;
-  countOldPN.textContent = `字符数：${pn2.length}`;
-  countOldSN.textContent = `字符数：${sn2.length}`;
+  // ✅ 字符数统计（必须在格式化之后）- 添加安全检查
+  if (countNewPN) countNewPN.textContent = `字符数：${pn1.length}`;
+  if (countNewSN) countNewSN.textContent = `字符数：${sn1.length}`;
+  if (countOldPN) countOldPN.textContent = `字符数：${pn2.length}`;
+  if (countOldSN) countOldSN.textContent = `字符数：${sn2.length}`;
 
-  // Samsung 格式校验提示
-  if (type === "内存") {
+  // Samsung 格式校验提示 - 添加安全检查
+  if (type === "内存" && checkNewPN && checkOldPN) {
     if (brand1 === "Samsung" && pn1 && !pn1.startsWith("M")) {
       checkNewPN.textContent = "请检查内存PN";
       checkNewPN.className = "text-danger me-2";
@@ -682,8 +700,8 @@ const update = () => {
     }
   }
 
-  // 优化：只要新旧PN都已选择且不为"请选择硬盘PN"时就校验一致性
-  if (type === "内存" || type === "硬盘") {
+  // 优化：只要新旧PN都已选择且不为"请选择硬盘PN"时就校验一致性 - 添加安全检查
+  if ((type === "内存" || type === "硬盘") && checkNewPN && checkOldPN) {
     if (pn1 && pn2 && pn1 !== "" && pn2 !== "" && pn1 !== "请选择硬盘PN" && pn2 !== "请选择硬盘PN") {
       if (pn1 === pn2) {
         checkNewPN.textContent = "PN一致";
@@ -704,19 +722,23 @@ const update = () => {
     }
   }
 
-  // 文本预览生成（顶格写法）
-  let text = '';
-  if (!type || type === '请选择') {
-    text = '上新下旧：更换「   」\n单号：\n服务器SN：\n新件品牌：\n新件SN：\n新件PN：\n旧件品牌：\n旧件SN：\n旧件PN：';
-  } else {
-    text = `上新下旧：更换「${type || ' '}」\n单号：${order}\n${isOptical ? "位置：" + switchLoc + " " + port : "服务器SN：" + server}\n新件品牌：${brand1}\n新件SN：${sn1}\n新件PN：${pn1}\n旧件品牌：${brand2}\n旧件SN：${sn2}\n旧件PN：${pn2}`;
+  // 文本预览生成（顶格写法）- 添加安全检查
+  if (preview) {
+    let text = '';
+    if (!type || type === '请选择') {
+      text = '上新下旧：更换「   」\n单号：\n服务器SN：\n新件品牌：\n新件SN：\n新件PN：\n旧件品牌：\n旧件SN：\n旧件PN：';
+    } else {
+      text = `上新下旧：更换「${type || ' '}」\n单号：${order}\n${isOptical ? "位置：" + switchLoc + " " + port : "服务器SN：" + server}\n新件品牌：${brand1}\n新件SN：${sn1}\n新件PN：${pn1}\n旧件品牌：${brand2}\n旧件SN：${sn2}\n旧件PN：${pn2}`;
+    }
+    preview.textContent = text;
+    // 解决 highlight.js 控制台警告
+    if (preview.dataset.highlighted) {
+      delete preview.dataset.highlighted;
+    }
+    if (typeof hljs !== 'undefined') {
+      hljs.highlightElement(preview);
+    }
   }
-  preview.textContent = text;
-  // 解决 highlight.js 控制台警告
-  if (preview.dataset.highlighted) {
-    delete preview.dataset.highlighted;
-  }
-  hljs.highlightElement(preview);
   saveFormData();
 };
 
@@ -863,24 +885,32 @@ const FormDataManager = {
   getPNValue: (type) => {
     const input = DOM.get(type === "new" ? "newPN" : "oldPN");
     const select = DOM.get(type === "new" ? "newPNSelect" : "oldPNSelect");
-    return (select?.style.display !== "none") ? select.value : input.value;
+    
+    // 安全检查：确保元素存在再访问value属性
+    if (select && select.style.display !== "none") {
+      return select.value || "";
+    }
+    return input ? input.value || "" : "";
   },
 
   // 保存表单数据
   save: () => {
     if (restoring) return;
     
-    // 字段映射配置
+    // 安全获取元素值的函数
+    const safeGetValue = (element) => element ? (element.value || "") : "";
+    
+    // 字段映射配置 - 增加安全检查
     const fieldMappings = [
-      ['pda_type', typeSelect.value],
-      ['pda_newBrand', newBrand.value],
-      ['pda_oldBrand', oldBrand.value],
-      ['pda_orderNo', orderNo.value],
-      ['pda_switchLocation', switchLocation.value],
-      ['pda_portNo', portNo.value],
-      ['pda_serverSN', serverSN.value],
-      ['pda_newSN', newSN.value],
-      ['pda_oldSN', oldSN.value],
+      ['pda_type', safeGetValue(typeSelect)],
+      ['pda_newBrand', safeGetValue(newBrand)],
+      ['pda_oldBrand', safeGetValue(oldBrand)],
+      ['pda_orderNo', safeGetValue(orderNo)],
+      ['pda_switchLocation', safeGetValue(switchLocation)],
+      ['pda_portNo', safeGetValue(portNo)],
+      ['pda_serverSN', safeGetValue(serverSN)],
+      ['pda_newSN', safeGetValue(newSN)],
+      ['pda_oldSN', safeGetValue(oldSN)],
       ['pda_newPN', FormDataManager.getPNValue("new")],
       ['pda_oldPN', FormDataManager.getPNValue("old")]
     ];
