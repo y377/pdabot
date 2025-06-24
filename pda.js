@@ -9,11 +9,12 @@ const DOM = (() => {
     return cache.get(id);
   };
   
-  // 批量获取元素
+  // 批量获取元素 - 修复ID转换逻辑
   const getMultiple = (ids) => {
     const result = {};
     ids.forEach(id => {
-      result[id.replace(/([A-Z])/g, '_$1').toLowerCase()] = get(id);
+      // 直接使用原始ID，不进行转换
+      result[id] = get(id);
     });
     return result;
   };
@@ -26,18 +27,18 @@ const DOM = (() => {
     'preview', 'copyBtn', 'orderNoDisplay', 'copyOrderNoBtn'
   ]);
   
-  return { get, getMultiple, ...elements };
+  return { get, getMultiple, cache, ...elements };
 })();
 
-// 解构常用元素
+// 解构常用元素 - 使用原始ID
 const { 
-  order_no: orderNo, type: typeSelect, switch_location: switchLocation, port_no: portNo, 
-  server_s_n: serverSN, server_s_n_row: serverSNRow, switch_info_row: switchInfoRow,
-  new_brand: newBrand, old_brand: oldBrand, new_p_n: newPN, old_p_n: oldPN,
-  new_s_n: newSN, old_s_n: oldSN, new_pn_options: newPnOptions, old_pn_options: oldPnOptions,
-  count_new_p_n: countNewPN, count_new_s_n: countNewSN, count_old_p_n: countOldPN, count_old_s_n: countOldSN,
-  check_new_p_n: checkNewPN, check_old_p_n: checkOldPN, preview, copy_btn: copyBtn,
-  order_no_display: orderNoDisplay, copy_order_no_btn: copyOrderNoBtn
+  orderNo, type: typeSelect, switchLocation, portNo, 
+  serverSN, serverSNRow, switchInfoRow,
+  newBrand, oldBrand, newPN, oldPN,
+  newSN, oldSN, newPnOptions, oldPnOptions,
+  countNewPN, countNewSN, countOldPN, countOldSN,
+  checkNewPN, checkOldPN, preview, copyBtn,
+  orderNoDisplay, copyOrderNoBtn
 } = DOM;
 
 let restoring = false;
@@ -66,10 +67,10 @@ const EventManager = {
 // 单号处理逻辑 - 添加安全检查
 if (orderNo && orderNoDisplay && copyOrderNoBtn) {
   orderNo.addEventListener("input", () => {
-    const val = orderNo.value.trim();
-    const num = val.match(/(\d+)(?!.*\d)/)?.[0] || "";
+  const val = orderNo.value.trim();
+  const num = val.match(/(\d+)(?!.*\d)/)?.[0] || "";
     orderNoDisplay.textContent = num ? `${num}` : "";
-    
+  
     copyOrderNoBtn.style.display = num ? "inline-block" : "none";
     copyOrderNoBtn.setAttribute("data-clipboard-text", num);
   });
@@ -81,8 +82,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const clipboard = new ClipboardJS(selector);
     clipboard.on('success', (e) => {
       showToast(successMessage.replace('{text}', e.text), "success");
-      e.clearSelection();
-    });
+    e.clearSelection();
+  });
     clipboard.on('error', () => showToast("复制失败，请手动复制", "warning"));
     return clipboard;
   };
@@ -205,12 +206,12 @@ const updateBrandOptions = () => {
   
   // 只有在品牌不是"请选择"时才更新PN选项
   if (newBrand.value !== "请选择") {
-    updatePnOptions(type, newBrand.value, newPnOptions);
+  updatePnOptions(type, newBrand.value, newPnOptions);
   }
   if (oldBrand.value !== "请选择") {
-    updatePnOptions(type, oldBrand.value, oldPnOptions);
-  }
-  
+  updatePnOptions(type, oldBrand.value, oldPnOptions);
+}
+
   // 切换PN输入框类型
   switchPnInput(type);
 };
@@ -235,7 +236,6 @@ const LoginManager = {
     const url = type === 'scan' 
       ? 'https://pdabot.jsjs.net/auth/scan' 
       : 'https://pdabot.jsjs.net/auth/feishu';
-    
     try {
       const res = await fetch(url, {
         method: 'POST',
@@ -243,7 +243,6 @@ const LoginManager = {
         body: JSON.stringify({ code })
       });
       const data = await res.json();
-      
       if (data.code === 0) {
         const userData = data.data;
         Object.entries({
@@ -253,10 +252,8 @@ const LoginManager = {
           userName: userData.name,
           accessToken: userData.access_token
         }).forEach(([key, value]) => localStorage.setItem(key, value));
-        
         currentUser = { id: userData.user_id, name: userData.name };
         showMainUI(userData.name);
-        loadChatList();
       } else {
         showToast('登录失败', 'danger');
         showLoginUI();
@@ -282,17 +279,14 @@ const LoginManager = {
       const urlParams = new URLSearchParams(window.location.search);
       const code = urlParams.get('code');
       const state = urlParams.get('state');
-      
       if (code) {
         const type = state === 'scan' ? 'scan' : 'feishu';
         LoginManager.handleCallback({ code, type });
       } else {
         const userData = ['isLoggedIn', 'userId', 'userName'].map(key => localStorage.getItem(key));
-        
         if (userData[0] === 'true' && userData[1] && userData[2]) {
           currentUser = { id: userData[1], name: userData[2] };
           showMainUI(userData[2]);
-          loadChatList();
         } else {
           showLoginUI();
         }
@@ -371,8 +365,8 @@ const OptionsRenderer = {
   renderOptions: (type, brand, targetElement, isSelect = false) => {
     if (!window.partsData || !OptionsRenderer.config[type]) {
       console.warn(`数据源未就绪: partsData=${!!window.partsData}, config=${!!OptionsRenderer.config[type]}`);
-      return;
-    }
+    return;
+  }
     
     const config = OptionsRenderer.config[type];
     const list = window.partsData[config.dataSource]?.filter(item => item.brand === brand) || [];
@@ -440,14 +434,14 @@ const loadFormData = async () => {
     const typeVal = localStorage.getItem('pda_type');
     if (!typeVal || typeVal === "请选择" || !window.partsData?.brandMap?.[typeVal]) return;
     
-    typeSelect.value = typeVal;
-    await updateBrandOptions();
+      typeSelect.value = typeVal;
+      await updateBrandOptions();
 
     // 恢复品牌选择
     const brandValues = ['newBrand', 'oldBrand'].map(key => localStorage.getItem(`pda_${key}`));
     await new Promise(resolve => {
-      const checkOptions = () => {
-        if (newBrand.options.length > 0 && oldBrand.options.length > 0) {
+          const checkOptions = () => {
+            if (newBrand.options.length > 0 && oldBrand.options.length > 0) {
           [newBrand, oldBrand].forEach((element, index) => {
             const value = brandValues[index];
             if (value && value !== "请选择") {
@@ -455,13 +449,13 @@ const loadFormData = async () => {
               element.dispatchEvent(new Event('change'));
             }
           });
-          resolve();
-        } else {
-          setTimeout(checkOptions, 100);
-        }
-      };
-      checkOptions();
-    });
+              resolve();
+            } else {
+              setTimeout(checkOptions, 100);
+            }
+          };
+          checkOptions();
+        });
 
     // 恢复其他输入框
     const fieldMappings = [
@@ -479,25 +473,25 @@ const loadFormData = async () => {
     });
 
     // 处理PN输入框
-    if (typeVal === '硬盘') {
-      switchPnInput('硬盘');
+      if (typeVal === '硬盘') {
+        switchPnInput('硬盘');
       updatePnOptions('硬盘', brandValues[0], newPnOptions);
       updatePnOptions('硬盘', brandValues[1], oldPnOptions);
-      
-      setTimeout(() => {
+        
+            setTimeout(() => {
         ['new', 'old'].forEach((type, index) => {
           const value = localStorage.getItem(`pda_${type}PN`);
           if (value) {
             const select = DOM.get(`${type}PNSelect`);
-            if (select) {
+                  if (select) {
               select.value = value;
-              select.dispatchEvent(new Event('change'));
-            }
-          }
-        });
-        bindPNSelectSave();
-      }, 120);
-    } else {
+                    select.dispatchEvent(new Event('change'));
+                  }
+                }
+              });
+              bindPNSelectSave();
+            }, 120);
+      } else {
       ['new', 'old'].forEach(type => {
         const value = localStorage.getItem(`pda_${type}PN`);
         if (value) {
@@ -506,14 +500,14 @@ const loadFormData = async () => {
           
           if (select?.style.display !== 'none') {
             select.value = value;
-            select.dispatchEvent(new Event('change'));
-          } else {
+              select.dispatchEvent(new Event('change'));
+            } else {
             input.value = value;
-            input.dispatchEvent(new Event('input'));
+              input.dispatchEvent(new Event('input'));
+            }
           }
-        }
-      });
-      bindPNSelectSave();
+        });
+        bindPNSelectSave();
     }
   } catch (error) {
     console.error('加载表单数据失败:', error);
@@ -581,10 +575,9 @@ const PNInputManager = {
         select.addEventListener("change", update);
         parentElement.appendChild(select);
         
-        // 更新DOM缓存
-        if (DOM.cache && typeof DOM.cache.set === 'function') {
-          DOM.cache.set(targetId, select);
-        }
+        // 更新DOM缓存 - 修复缓存访问
+        const cache = DOM.cache || new Map();
+        cache.set(targetId, select);
         
         console.log(`成功创建select元素: ${targetId}`);
       } catch (error) {
@@ -601,7 +594,7 @@ const PNInputManager = {
     if (showSelect && selectElement) {
       selectElement.style.display = "";
       if (inputElement) inputElement.style.display = "none";
-    } else {
+  } else {
       if (selectElement) selectElement.style.display = "none";
       if (inputElement) inputElement.style.display = "";
     }
@@ -634,7 +627,7 @@ const PNInputManager = {
       if (selectElement) {
         OptionsRenderer.renderOptions(type, brand, selectElement, true);
       }
-    } else {
+  } else {
       selectElement = DOM.get(selectId);
     }
     
@@ -800,19 +793,19 @@ const update = () => {
 
   // 文本预览生成（顶格写法）- 添加安全检查
   if (preview) {
-    let text = '';
-    if (!type || type === '请选择') {
-      text = '上新下旧：更换「   」\n单号：\n服务器SN：\n新件品牌：\n新件SN：\n新件PN：\n旧件品牌：\n旧件SN：\n旧件PN：';
-    } else {
-      text = `上新下旧：更换「${type || ' '}」\n单号：${order}\n${isOptical ? "位置：" + switchLoc + " " + port : "服务器SN：" + server}\n新件品牌：${brand1}\n新件SN：${sn1}\n新件PN：${pn1}\n旧件品牌：${brand2}\n旧件SN：${sn2}\n旧件PN：${pn2}`;
-    }
-    preview.textContent = text;
-    // 解决 highlight.js 控制台警告
-    if (preview.dataset.highlighted) {
-      delete preview.dataset.highlighted;
-    }
+  let text = '';
+  if (!type || type === '请选择') {
+    text = '上新下旧：更换「   」\n单号：\n服务器SN：\n新件品牌：\n新件SN：\n新件PN：\n旧件品牌：\n旧件SN：\n旧件PN：';
+  } else {
+    text = `上新下旧：更换「${type || ' '}」\n单号：${order}\n${isOptical ? "位置：" + switchLoc + " " + port : "服务器SN：" + server}\n新件品牌：${brand1}\n新件SN：${sn1}\n新件PN：${pn1}\n旧件品牌：${brand2}\n旧件SN：${sn2}\n旧件PN：${pn2}`;
+  }
+  preview.textContent = text;
+  // 解决 highlight.js 控制台警告
+  if (preview.dataset.highlighted) {
+    delete preview.dataset.highlighted;
+  }
     if (typeof hljs !== 'undefined') {
-      hljs.highlightElement(preview);
+  hljs.highlightElement(preview);
     }
   }
   saveFormData();
@@ -958,22 +951,22 @@ const sendApplyNotify = () => {
 
 // 表单数据管理器
 const FormDataManager = {
-  // 获取PN值（兼容input和select）
+// 获取PN值（兼容input和select）
   getPNValue: (type) => {
     const input = DOM.get(type === "new" ? "newPN" : "oldPN");
     const select = DOM.get(type === "new" ? "newPNSelect" : "oldPNSelect");
     
     // 安全检查：确保元素存在再访问value属性
-    if (select && select.style.display !== "none") {
+  if (select && select.style.display !== "none") {
       return select.value || "";
-    }
+  }
     return input ? input.value || "" : "";
   },
 
-  // 保存表单数据
+// 保存表单数据
   save: () => {
-    if (restoring) return;
-    
+  if (restoring) return;
+  
     // 安全获取元素值的函数
     const safeGetValue = (element) => element ? (element.value || "") : "";
     
@@ -999,10 +992,10 @@ const FormDataManager = {
     fieldMappings.forEach(([key, value]) => {
       if (value && !invalidValues.includes(value)) {
         localStorage.setItem(key, value);
-      } else {
-        localStorage.removeItem(key);
-      }
-    });
+    } else {
+      localStorage.removeItem(key);
+    }
+  });
   },
 
   // 绑定PN Select保存事件
@@ -1059,18 +1052,9 @@ const resetForm = () => {
     // 新增：清除接口缓存
     if ('caches' in window) {
       caches.open('pda-cache-2.2.2').then(cache => {
-        cache.delete('https://pn.jsjs.net/pn');
+        cache.delete('https://pn.scdn.vip:25625/pn.json');
       });
     }
-  }
-};
-
-// 使用 login.js 中的 loadChatList 函数
-const loadChatList = () => {
-  if (window.loginUtils && window.loginUtils.loadChatList) {
-    return window.loginUtils.loadChatList();
-  } else {
-    showToast('登录模块未加载完成', 'warning');
   }
 };
 
@@ -1128,19 +1112,19 @@ const FormValidator = {
 
     typeSelect?.addEventListener('change', FormValidator.updateConditionalFields);
 
-    form.addEventListener('submit', (event) => {
-      event.preventDefault();
-      event.stopPropagation();
+  form.addEventListener('submit', (event) => {
+    event.preventDefault();
+    event.stopPropagation();
       FormValidator.updateConditionalFields();
 
-      if (form.checkValidity()) {
-        sendToFeishu();
-        showToast('表单验证通过，正在发送...', 'success');
-      } else {
-        showToast('请填写所有必填字段', 'danger');
-      }
-      form.classList.add('was-validated');
-    });
+    if (form.checkValidity()) {
+      sendToFeishu();
+      showToast('表单验证通过，正在发送...', 'success');
+    } else {
+      showToast('请填写所有必填字段', 'danger');
+    }
+    form.classList.add('was-validated');
+  });
 
     form.querySelectorAll('input[required], select[required]').forEach(FormValidator.bindElementValidation);
   }
@@ -1153,11 +1137,11 @@ const originalResetForm = resetForm;
 Object.assign(window, {
   resetForm: () => {
     const form = DOM.get('pdaForm');
-    if (form) {
-      form.classList.remove('was-validated');
+  if (form) {
+    form.classList.remove('was-validated');
       form.querySelectorAll('.is-valid, .is-invalid').forEach(el => el.classList.remove('is-valid', 'is-invalid'));
-    }
-    originalResetForm();
+  }
+  originalResetForm();
   }
 });
 
@@ -1182,4 +1166,4 @@ document.addEventListener('DOMContentLoaded', () => {
     debugDOMState(); // 调试DOM状态
     initFormValidation();
   }, 1000);
-});
+}); 
