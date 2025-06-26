@@ -885,7 +885,7 @@ const sendToFeishu = () => {
     },
     body: JSON.stringify({
       title: `更换通知 - ${type}`,
-      orderNo: orderNum,
+      orderNo: orderUrl,
       chatId: chatId,
       data: data
     }),
