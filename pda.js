@@ -599,10 +599,20 @@ const PNInputManager = {
   toggleDisplay: (selectElement, inputElement, showSelect) => {
     if (showSelect && selectElement) {
       selectElement.style.display = "";
-      if (inputElement) inputElement.style.display = "none";
-  } else {
-      if (selectElement) selectElement.style.display = "none";
-      if (inputElement) inputElement.style.display = "";
+      selectElement.setAttribute('required', '');
+      if (inputElement) {
+        inputElement.style.display = "none";
+        inputElement.removeAttribute('required');
+      }
+    } else {
+      if (selectElement) {
+        selectElement.style.display = "none";
+        selectElement.removeAttribute('required');
+      }
+      if (inputElement) {
+        inputElement.style.display = "";
+        inputElement.setAttribute('required', '');
+      }
     }
   },
 
